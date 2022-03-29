@@ -335,14 +335,15 @@ class ASTModel(nn.Module):
                 x = blk(x)
         x = self.v.norm(x)
 
-        if pca_proj:
-            pca_proj_values = x
         
         # if models has two cls tokens (DEIT), average as the clip-level representation
         if self.cls_token_num == 2:
             x = (x[:, 0] + x[:, 1]) / 2
         else:
             x = x[:, 0]
+        
+        if pca_proj:
+            pca_proj_values = x
         x = self.mlp_head(x)
         if return_attention and pca_proj:
             return x, (pca_proj_values, attention)
