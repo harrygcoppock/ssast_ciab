@@ -12,7 +12,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 sys.path.append('../../')
 from models.ast_models import ASTModel
-
 import dataloader
 
 def load_trained_model(model_path, device):
@@ -93,7 +92,7 @@ def format_attention_map(attentions, audio_model, method, args, threshold=False)
     # we keep only the output patch attenion
     print(audio_model.module.f_dim)
     print(audio_model.module.t_dim)
-    attentions = attentions[1, :, 0, 2:].reshape(nh, -1)
+    attentions = attentions[0, :, 0, 2:].reshape(nh, -1)
     if threshold:
         attentions = threshold_att(attentions, nh, audio_model, args)
         #plt.imsave(fname='first3.png', arr=attentions[2], format='png')
@@ -136,13 +135,18 @@ def threshold_att(attentions, nh, audio_model, args):
             )[0].cpu().numpy()
     return th_attn
 
-def plot_attentions(attensions, fbank, nh):
-    fig, axs = plt.subplots(nh+1,1, figsize=(8,20))
-    axs[0].imshow(fbank[1])
+def plot_attentions(attensions, fbank, nh, mean, std):
+    fig, axs = plt.subplots(nh+1,1, figsize=(8,20), sharex=True)
+    axs[0].imshow(fbank[0])
     for i in range(nh):
         #plot for each head
         axs[i+1].imshow(attensions[i])
     plt.savefig('attentions4.png')
+    np.save('fbank', (fbank[0]*std**2)+mean)
+
+#def reverse_mel(fbank):
+#    audio = librosa.feature.inverse.mel_to_audio(fbank, sr=16000)
+#    print(audio)
 
 def main(model_path, method='patch'):
 
@@ -155,7 +159,7 @@ def main(model_path, method='patch'):
     eval_dataset, eval_loader = get_dataset(args)   
     attention, fbank = get_attention(audio_model, eval_loader, device, args)
     attentions, nh = format_attention_map(attention, audio_model, method, args)
-    plot_attentions(attentions, fbank, nh)
+    plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std)
 
 if __name__ == '__main__':
     main('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')
