@@ -193,10 +193,12 @@ class AudioDataset(Dataset):
         freqm = torchaudio.transforms.FrequencyMasking(self.freqm)
         timem = torchaudio.transforms.TimeMasking(self.timem)
         fbank = torch.transpose(fbank, 0, 1)
+        fbank = fbank.unsqueeze(0)
         if self.freqm != 0:
             fbank = freqm(fbank)
         if self.timem != 0:
             fbank = timem(fbank)
+        fbank = fbank.squeeze(0)
         fbank = torch.transpose(fbank, 0, 1)
 
         # normalize the input for both training and test
@@ -205,7 +207,6 @@ class AudioDataset(Dataset):
         # skip normalization the input if you are trying to get the normalization stats.
         else:
             pass
-
         if self.noise == True:
             fbank = fbank + torch.rand(fbank.shape[0], fbank.shape[1]) * np.random.rand() / 10
             fbank = torch.roll(fbank, np.random.randint(-10, 10), 0)

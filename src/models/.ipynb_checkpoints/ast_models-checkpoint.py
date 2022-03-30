@@ -292,8 +292,6 @@ class ASTModel(nn.Module):
         end_blocks = len(self.v.blocks) - 1
         for blk_id, blk in enumerate(self.v.blocks):
             if return_attention and blk_id == end_blocks:
-                print(dir(blk))
-                print(blk)
                 blk.forward_att = types.MethodType(forward_att, blk)
                 x, attention = blk.forward_att(x)
             else:
@@ -305,11 +303,11 @@ class ASTModel(nn.Module):
             pca_proj_values = x
         x = self.mlp_head(x)
         if return_attention and pca_proj:
-            return x, (pca_proj, attention)
+            return x, (pca_proj_values, attention)
         elif return_attention:
             return x, attention
         elif pca_proj:
-            return x, pca_proj
+            return x, pca_proj_values
         return x
 
     def finetuningcls(self, x, pca_proj=False, return_attention=False):
@@ -328,7 +326,7 @@ class ASTModel(nn.Module):
             x = torch.cat((cls_tokens, x), dim=1)
         x = x + self.v.pos_embed
         x = self.v.pos_drop(x)
-        end_blocks = len(self.v.blocks)
+        end_blocks = len(self.v.blocks) - 1
         for blk_id, blk in enumerate(self.v.blocks):
             if return_attention and blk_id == end_blocks:
                 blk.forward_att = types.MethodType(forward_att, blk)
@@ -337,21 +335,22 @@ class ASTModel(nn.Module):
                 x = blk(x)
         x = self.v.norm(x)
 
-        if pca_proj:
-            pca_proj_values = x
         
         # if models has two cls tokens (DEIT), average as the clip-level representation
         if self.cls_token_num == 2:
             x = (x[:, 0] + x[:, 1]) / 2
         else:
             x = x[:, 0]
+        
+        if pca_proj:
+            pca_proj_values = x
         x = self.mlp_head(x)
         if return_attention and pca_proj:
-            return x, (pca_proj, attention)
+            return x, (pca_proj_values, attention)
         elif return_attention:
             return x, attention
         elif pca_proj:
-            return x, pca_proj
+            return x, pca_proj_values
         return x
 
     # masked patch pretraining with discriminative objective

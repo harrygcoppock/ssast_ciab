@@ -13,7 +13,6 @@ import sys
 import time
 import torch
 import torch.nn as nn
-import pandas as pd
 import json
 from torch.utils.data import WeightedRandomSampler
 basepath = os.path.dirname(os.path.dirname(sys.path[0]))
@@ -91,8 +90,15 @@ parser.add_argument("--wa_start", type=int, default=16, help="which epoch to sta
 parser.add_argument("--wa_end", type=int, default=30, help="which epoch to end weight averaging in finetuning")
 parser.add_argument("--loss", type=str, default="BCE", help="the loss function for finetuning, depend on the task", choices=["BCE", "CE"])
 
+parser.add_argument("--wandb", type=str, default=None, help="Do you want to log your changes to wandb?", choices=[None, "wandb"])
 args = parser.parse_args()
 
+
+
+if args.wandb == 'wandb':
+    import wandb
+    wandb.init(project='ciab', entity='harrygcoppock')
+    wandb.config = args
 # # dataset spectrogram mean and std, used to normalize the input
 # norm_stats = {'librispeech':[-4.2677393, 4.5689974], 'howto100m':[-4.2677393, 4.5689974], 'audioset':[-4.2677393, 4.5689974], 'esc50':[-6.6268077, 5.358466], 'speechcommands':[-6.845978, 5.5654526]}
 # target_length = {'librispeech': 1024, 'howto100m':1024, 'audioset':1024, 'esc50':512, 'speechcommands':128}
@@ -187,7 +193,7 @@ if args.data_standard_test != None:
     eval_dataset = dataloader.AudioDataset(args.data_standard_test, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=True)
     eval_loader = torch.utils.data.DataLoader(
         eval_dataset,
-        batch_size=args.batch_size*2, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+        batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
     
     stats, _, pca_proj= validate(audio_model, 
             eval_loader, 
@@ -208,7 +214,7 @@ if args.data_standard_test != None:
         matched_dataset = dataloader.AudioDataset(args.data_matched_test, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=True)
         matched_test_loader = torch.utils.data.DataLoader(
                 matched_dataset,
-                batch_size=args.batch_size*2, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+                batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
         stats, _, pca_proj = validate(audio_model, 
                 matched_test_loader, 
                 args, 
@@ -228,7 +234,7 @@ if args.data_standard_test != None:
         long_dataset = dataloader.AudioDataset(args.data_long_test, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=True)
         long_test_loader = torch.utils.data.DataLoader(
                 long_dataset,
-                batch_size=args.batch_size*2, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+                batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
         stats, _, pca_proj = validate(audio_model, 
                 long_test_loader, 
                 args, 
@@ -249,7 +255,7 @@ if args.data_standard_test != None:
     analysis_train_dataset = dataloader.AudioDataset(args.data_train, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=True)
     analysis_train_loader = torch.utils.data.DataLoader(
             analysis_train_dataset,
-            batch_size=args.batch_size*2, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+            batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
     stats, _, pca_proj = validate(audio_model, 
             analysis_train_loader, 
             args, 

@@ -326,7 +326,7 @@ class ASTModel(nn.Module):
             x = torch.cat((cls_tokens, x), dim=1)
         x = x + self.v.pos_embed
         x = self.v.pos_drop(x)
-        end_blocks = len(self.v.blocks)
+        end_blocks = len(self.v.blocks) - 1
         for blk_id, blk in enumerate(self.v.blocks):
             if return_attention and blk_id == end_blocks:
                 blk.forward_att = types.MethodType(forward_att, blk)

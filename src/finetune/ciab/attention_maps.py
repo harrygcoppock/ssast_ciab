@@ -4,9 +4,11 @@ author: Harry Coppock
 Qs: harry.coppock@imperial.ac.uk
 '''
 import torch
+import torch.nn as nn
 import pickle
 import os
 import sys
+import numpy as np
 import matplotlib.pyplot as plt
 sys.path.append('../../')
 from models.ast_models import ASTModel
@@ -15,6 +17,7 @@ import dataloader
 
 def load_trained_model(model_path, device):
     args = load_args(model_path)
+    args.wandb = False
     audio_model = ASTModel(
             label_dim=args.n_class, 
             fshape=args.fshape, 
@@ -25,7 +28,7 @@ def load_trained_model(model_path, device):
             input_tdim=args.target_length,
             model_size=args.model_size,
             pretrain_stage=False,
-            load_pretrained_mdl_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast/src/finetune/ciab/SSAST-Base-Frame-400.pth'
+            load_pretrained_mdl_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/SSAST-Base-Patch-400.pth'
             )
     sd = torch.load(os.path.join(model_path, 'models/best_audio_model.pth'), map_location=device)
     if not isinstance(audio_model, torch.nn.DataParallel):
@@ -39,7 +42,7 @@ def load_args(model_path):
         print(args)
     return args
 
-def get_dataset(args, path_data='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast/src/finetune/ciab/data/datafiles/audio_sentence_url/ciab_standard_test_data_1.json'):
+def get_dataset(args, path_data='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/data/datafiles/audio_sentence_url/ciab_standard_test_data_1.json'):
     print(os.path.exists(path_data))
     val_audio_conf = {
             'num_mel_bins': args.num_mel_bins, 
@@ -54,7 +57,7 @@ def get_dataset(args, path_data='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssa
             }
     eval_dataset = dataloader.AudioDataset(
         path_data,
-        label_csv='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast/src/finetune/ciab/data/ciab_class_labels_indices.csv',
+        label_csv='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/data/ciab_class_labels_indices.csv',
         audio_conf=val_audio_conf,
         pca_proj=True)
     eval_loader = torch.utils.data.DataLoader(
@@ -78,9 +81,9 @@ def get_attention(audio_model, loader, device, args):
             return_attention=True
             )
     pca_proj, attention = tup_out
-    return attention
+    return attention, fbank.cpu().transpose(1,2)
 
-def format_attention_map(attentions, audio_model):
+def format_attention_map(attentions, audio_model, method, args, threshold=False):
     '''
     reshape attention so that it is the same size as orignal fbank
     '''
@@ -90,17 +93,58 @@ def format_attention_map(attentions, audio_model):
     # we keep only the output patch attenion
     print(audio_model.module.f_dim)
     print(audio_model.module.t_dim)
-    attentions = attentions[0, :, 0, 2:].reshape(nh, -1)
-    attentions = attentions.reshape(nh, audio_model.module.t_dim)
-    print(attentions[0])
-    #attentions = attentions.reshape(nh, w_featmap, h_featmap)
-    #attentions = nn.functional.interpolate(attentions.unsqueeze(0), scale_factor=args.patch_size, mode="nearest")[0].cpu().numpy()
-    #plt.imsave(fname='first.png', arr=attentions[0].cpu().numpy(), format='png')
-    attentions = attentions[0].cpu().numpy()
-    fig = plt.figure()
-    plt.plot(list(range(len(attentions))), attentions)
-    plt.savefig('attention.png')
-def main(model_path):
+    attentions = attentions[1, :, 0, 2:].reshape(nh, -1)
+    if threshold:
+        attentions = threshold_att(attentions, nh, audio_model, args)
+        #plt.imsave(fname='first3.png', arr=attentions[2], format='png')
+        return attentions, nh
+    if method == 'frame':
+        attentions = attentions.reshape(nh, audio_model.module.t_dim)
+        print(attentions[0])
+        attentions = attentions[0].cpu().numpy()
+        #fig = plt.figure()
+        #plt.plot(list(range(len(attentions))), attentions)
+        #plt.savefig('attention.png')
+        return attentions, nh
+    else:
+        print('assuming patch based approach')
+        print(attentions.size())
+        attentions = attentions.reshape(nh, audio_model.module.f_dim, audio_model.module.t_dim)
+        attentions = nn.functional.interpolate(
+                attentions.unsqueeze(0), 
+                scale_factor=(args.fshape, args.tshape), 
+                mode="nearest")[0].cpu().numpy()
+        print(np.shape(attentions[0]))
+        #plt.imsave(fname='first2.png', arr=attentions[0], format='png')
+        return attentions, nh
+
+def threshold_att(attentions, nh, audio_model, args):
+    # we keep only a certain percentage of the mass
+    val, idx = torch.sort(attentions)
+    val /= torch.sum(val, dim=1, keepdim=True)
+    cumval = torch.cumsum(val, dim=1)
+    th_attn = cumval > (1 - 0.1)
+    idx2 = torch.argsort(idx)
+    for head in range(nh):
+        th_attn[head] = th_attn[head][idx2[head]]
+    th_attn = th_attn.reshape(nh, audio_model.module.f_dim, audio_model.module.t_dim).float()
+    # interpolate
+    th_attn = nn.functional.interpolate(
+            th_attn.unsqueeze(0), 
+            scale_factor=(args.fshape, args.tshape), 
+            mode="nearest"
+            )[0].cpu().numpy()
+    return th_attn
+
+def plot_attentions(attensions, fbank, nh):
+    fig, axs = plt.subplots(nh+1,1, figsize=(8,20))
+    axs[0].imshow(fbank[1])
+    for i in range(nh):
+        #plot for each head
+        axs[i+1].imshow(attensions[i])
+    plt.savefig('attentions4.png')
+
+def main(model_path, method='patch'):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     audio_model, args = load_trained_model(model_path, device)
@@ -109,8 +153,9 @@ def main(model_path):
     elif args.loss == 'CE':
         args.loss_fn = torch.nn.CrossEntropyLoss()
     eval_dataset, eval_loader = get_dataset(args)   
-    attention = get_attention(audio_model, eval_loader, device, args)
-    format_attention_map(attention, audio_model)
+    attention, fbank = get_attention(audio_model, eval_loader, device, args)
+    attentions, nh = format_attention_map(attention, audio_model, method, args)
+    plot_attentions(attentions, fbank, nh)
 
 if __name__ == '__main__':
-    main('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast/src/finetune/ciab/exp/test01-ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train-final/fold1')
+    main('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')

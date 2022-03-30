@@ -360,11 +360,11 @@ def validate(audio_model, val_loader, args, epoch, pca_proj=False, dataset=None,
         # wandb log
         if args.wandb == 'wandb':
             wandb.log({
-                'epoch': epoch,
-                'PR_AUC': stats[1]['AP'],
-                'ROC_AUC': stats[1]['auc'],
-                'UAR': stats[1]['uar'],
-                'Accuracy': stats[1]['acc']})
+                f'{test_type}_epoch': epoch,
+                f'{test_type}_PR_AUC': stats[1]['AP'],
+                f'{test_type}_ROC_AUC': stats[1]['auc'],
+                f'{test_type}_UAR': stats[1]['uar'],
+                f'{test_type}_Accuracy': stats[1]['acc']})
 
         # save the prediction here
         exp_dir = args.exp_dir

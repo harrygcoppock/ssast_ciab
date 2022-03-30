@@ -8,6 +8,7 @@
 *.pickle
 *.csv
 *.pkl
+*.png
 /src/finetune/ciab/wandb/*
 figure/*
 !figure/10854_ssast.pdf

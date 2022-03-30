@@ -23,7 +23,7 @@ fi
 pretrain_exp=unknown
 pretrain_model=SSAST-Base-Patch-400
 
-dataset=ciab_sentence
+dataset=ciab_three_cough
 if [ "$dataset" == ciab_three_cough ]
 then
 	dataset_mean=-8.2096
@@ -48,7 +48,7 @@ lr=1e-4
 freqm=24
 timem=96
 mixup=0
-epoch=1
+epoch=20
 batch_size=18
 fshape=16
 tshape=16
@@ -67,18 +67,18 @@ echo 'now process fold'${fold}
 
 exp_dir=${base_exp_dir}/fold${fold}
 
-train_data=./data/datafiles/audio_sentence_url/ciab_train_data_${fold}.json
-validation_data=./data/datafiles/audio_sentence_url/ciab_validation_data_${fold}.json
-standard_test_data=./data/datafiles/audio_sentence_url/ciab_standard_test_data_${fold}.json
-matched_test_data=./data/datafiles/audio_sentence_url/ciab_matched_test_data_${fold}.json
-matched_train_data=./data/datafiles/audio_sentence_url/ciab_matched_train_data_${fold}.json
-matched_validation_data=./data/datafiles/audio_sentence_url/ciab_matched_validation_data_${fold}.json
-long_test_data=./data/datafiles/audio_sentence_url/ciab_long_test_data_${fold}.json
-naive_train_data=./data/datafiles/audio_sentence_url/naive_train_${fold}.json
-naive_validation_data=./data/datafiles/audio_sentence_url/naive_validation_${fold}.json
-naive_test_data=./data/datafiles/audio_sentence_url/naive_test_${fold}.json
-big_train_data=./data/datafiles/audio_sentence_url/big_train_${fold}.json
-big_validation_data=./data/datafiles/audio_sentence_url/big_validation_${fold}.json
+train_data=./data/datafiles/audio_three_cough_url/ciab_train_data_${fold}.json
+validation_data=./data/datafiles/audio_three_cough_url/ciab_validation_data_${fold}.json
+standard_test_data=./data/datafiles/audio_three_cough_url/ciab_standard_test_data_${fold}.json
+matched_test_data=./data/datafiles/audio_three_cough_url/ciab_matched_test_data_${fold}.json
+matched_train_data=./data/datafiles/audio_three_cough_url/ciab_matched_train_data_${fold}.json
+matched_validation_data=./data/datafiles/audio_three_cough_url/ciab_matched_validation_data_${fold}.json
+long_test_data=./data/datafiles/audio_three_cough_url/ciab_long_test_data_${fold}.json
+naive_train_data=./data/datafiles/audio_three_cough_url/naive_train_${fold}.json
+naive_validation_data=./data/datafiles/audio_three_cough_url/naive_validation_${fold}.json
+naive_test_data=./data/datafiles/audio_three_cough_url/naive_test_${fold}.json
+big_train_data=./data/datafiles/audio_three_cough_url/big_train_${fold}.json
+big_validation_data=./data/datafiles/audio_three_cough_url/big_validation_${fold}.json
 
 # standard train
 CUDA_CACHE_DISABLE=1 python -W ignore ../../run.py --dataset ${dataset} \
@@ -111,7 +111,7 @@ CUDA_CACHE_DISABLE=1 python -W ignore ../../run.py --dataset ${dataset} \
 --num_mel_bins 128 --head_lr ${head_lr} --noise ${noise} \
 --lrscheduler_start 6 --lrscheduler_step 1 --lrscheduler_decay 0.85 --wa False --loss CE --metrics mAP \
 --wandb ${logger}
-#
+
 # naive method
 base_exp_dir=./exp/test01-${dataset}-f${fstride}-${fshape}-t${tstride}-${tshape}-b${batch_size}-lr${lr}-${task}-${model_size}-${pretrain_exp}-${pretrain_model}-${head_lr}x-noise${noise}-naive-final-2
 exp_dir=${base_exp_dir}/fold${fold}
