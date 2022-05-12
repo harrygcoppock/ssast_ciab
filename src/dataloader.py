@@ -8,7 +8,7 @@
 # Author: David Harwath
 # with some functions borrowed from https://github.com/SeanNaren/deepspeech.pytorch
 
-#minor edits by Harry Coppock to allow for dataset norm + mean to be calculated.
+#minor edits by Harry Coppock: harry.coppock@imperial.ac.uk
 
 import csv
 import json
