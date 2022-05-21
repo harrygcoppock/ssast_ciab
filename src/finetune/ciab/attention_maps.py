@@ -96,7 +96,7 @@ def format_attention_map(attentions, audio_model, method, args, threshold=False)
     if threshold:
         attentions = threshold_att(attentions, nh, audio_model, args)
         #plt.imsave(fname='first3.png', arr=attentions[2], format='png')
-        return attentions, nh
+        #return attentions, nh
     if method == 'frame':
         attentions = attentions.reshape(nh, audio_model.module.t_dim)
         print(attentions[0])
