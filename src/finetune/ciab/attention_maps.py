@@ -83,9 +83,9 @@ def get_attention(audio_model, loader, device, args):
             return_attention=True
             )
     pca_proj, attention = tup_out
-    return attention, fbank.cpu().transpose(1,2)
+    return attention, fbank.cpu().transpose(1,2), pca_proj
 
-def format_attention_map(attentions, audio_model, method, args, threshold_att_maps=True, batch_num=0):
+def format_attention_map(attentions, audio_model, method, args, threshold_att_maps=False, batch_num=0):
     '''
     reshape attention so that it is the same size as orignal fbank
     '''
@@ -183,10 +183,24 @@ def main(model_path, method='patch'):
     elif args.loss == 'CE':
         args.loss_fn = torch.nn.CrossEntropyLoss()
     eval_dataset, eval_loader = get_dataset(args)   
-    attention, fbank = get_attention(audio_model, eval_loader, device, args)
+    attention, fbank, pca_proj = get_attention(audio_model, eval_loader, device, args)
     attentions, nh = format_attention_map(attention, audio_model, method, args)
     plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=13)
     plot_attentions_overlay(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=13)
+    #get logits per time step
+    print(pca_proj.size())
+    logits = []
+    audio_model = audio_model.to(device)
+    audio_model.eval()
+    with torch.no_grad():
+        for i in range(pca_proj.size()[1]):
+            logits.append(torch.nn.functional.softmax(audio_model.module.mlp_head(pca_proj[2,i,:])))
+    print(logits)
+    logits = [x[1] - x[0] for x in logits]
+    logits = [x.cpu().numpy() for x in logits]
+    plt.figure()
+    plt.plot(range(0, len(logits)), logits)
+    plt.savefig('logits_positive.png')
 
 if __name__ == '__main__':
     main('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')
