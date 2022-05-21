@@ -9,7 +9,9 @@ import pickle
 import os
 import sys
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.colors import colorConverter
 sys.path.append('../../')
 from models.ast_models import ASTModel
 import dataloader
@@ -69,6 +71,7 @@ def get_dataset(args, path_data='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssa
 
 def get_attention(audio_model, loader, device, args):
     fbank, label_indices, index = next(iter(loader))
+    print('label', label_indices)
     fbank = fbank.to(device)
     audio_model = audio_model.to(device)
     audio_model.eval()
@@ -82,7 +85,7 @@ def get_attention(audio_model, loader, device, args):
     pca_proj, attention = tup_out
     return attention, fbank.cpu().transpose(1,2)
 
-def format_attention_map(attentions, audio_model, method, args, threshold=False):
+def format_attention_map(attentions, audio_model, method, args, threshold_att_maps=True, batch_num=0):
     '''
     reshape attention so that it is the same size as orignal fbank
     '''
@@ -92,11 +95,7 @@ def format_attention_map(attentions, audio_model, method, args, threshold=False)
     # we keep only the output patch attenion
     print(audio_model.module.f_dim)
     print(audio_model.module.t_dim)
-    attentions = attentions[0, :, 0, 2:].reshape(nh, -1)
-    if threshold:
-        attentions = threshold_att(attentions, nh, audio_model, args)
-        #plt.imsave(fname='first3.png', arr=attentions[2], format='png')
-        #return attentions, nh
+    attentions = attentions[batch_num, :, 0, 2:].reshape(nh, -1)
     if method == 'frame':
         attentions = attentions.reshape(nh, audio_model.module.t_dim)
         print(attentions[0])
@@ -106,6 +105,10 @@ def format_attention_map(attentions, audio_model, method, args, threshold=False)
         #plt.savefig('attention.png')
         return attentions, nh
     else:
+        if threshold_att_maps:
+            attentions = threshold_att(attentions, nh, audio_model, args)
+            #plt.imsave(fname='first3.png', arr=attentions[2], format='png')
+            #return attentions, nh
         print('assuming patch based approach')
         print(attentions.size())
         attentions = attentions.reshape(nh, audio_model.module.f_dim, audio_model.module.t_dim)
@@ -126,24 +129,47 @@ def threshold_att(attentions, nh, audio_model, args):
     idx2 = torch.argsort(idx)
     for head in range(nh):
         th_attn[head] = th_attn[head][idx2[head]]
-    th_attn = th_attn.reshape(nh, audio_model.module.f_dim, audio_model.module.t_dim).float()
+    #th_attn = th_attn.reshape(nh, audio_model.module.f_dim, audio_model.module.t_dim).float()
     # interpolate
-    th_attn = nn.functional.interpolate(
-            th_attn.unsqueeze(0), 
-            scale_factor=(args.fshape, args.tshape), 
-            mode="nearest"
-            )[0].cpu().numpy()
+    #th_attn = nn.functional.interpolate(
+    #        th_attn.unsqueeze(0), 
+    #        scale_factor=(args.fshape, args.tshape), 
+    #        mode="nearest"
+    #        )[0]
+    th_attn = th_attn.float()
+    print(th_attn)
+    print(th_attn.size())
     return th_attn
 
-def plot_attentions(attensions, fbank, nh, mean, std):
+def plot_attentions(attensions, fbank, nh, mean, std, batch_num=0):
     fig, axs = plt.subplots(nh+1,1, figsize=(8,20), sharex=True)
-    axs[0].imshow(fbank[0])
+    axs[0].imshow(fbank[batch_num])
     for i in range(nh):
         #plot for each head
         axs[i+1].imshow(attensions[i])
-    plt.savefig('attentions4.png')
-    np.save('fbank', (fbank[0]*std**2)+mean)
+    plt.savefig('attentions4.png', bbox_inches='tight')
 
+def plot_attentions_overlay(attensions, fbank, nh, mean, std, batch_num=0):
+    fig, axs = plt.subplots(1,1)
+    axs.imshow(fbank[batch_num])
+    color_list = ['cyan', 'brown', 'black', 'olive', 'pink', 'blue', 'green', 'lime', 'red', 'orange', 'yellow', 'purple']
+    for i in range(nh):
+        #plot for each head
+        # generate the colors for your colormap
+        color1 = colorConverter.to_rgba('white')
+        color2 = colorConverter.to_rgba(color_list[i])
+
+        # make the colormaps
+        cmap1 = mpl.colors.LinearSegmentedColormap.from_list('my_cmap2',[color1,color2],256)
+
+        cmap1._init() # create the _lut array, with rgba values
+
+        # create your alpha array and fill the colormap with them.
+        # here it is progressive, but you can create whathever you want
+        alphas = np.linspace(0, 0.8, cmap1.N+3)
+        cmap1._lut[:,-1] = alphas
+        axs.imshow(attensions[i], cmap=cmap1)
+    plt.savefig('attentions_overlay_3_covid_pos.png', bbox_inches='tight')
 #def reverse_mel(fbank):
 #    audio = librosa.feature.inverse.mel_to_audio(fbank, sr=16000)
 #    print(audio)
@@ -159,7 +185,8 @@ def main(model_path, method='patch'):
     eval_dataset, eval_loader = get_dataset(args)   
     attention, fbank = get_attention(audio_model, eval_loader, device, args)
     attentions, nh = format_attention_map(attention, audio_model, method, args)
-    plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std)
+    plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=13)
+    plot_attentions_overlay(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=13)
 
 if __name__ == '__main__':
     main('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')
