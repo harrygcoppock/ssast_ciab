@@ -14,27 +14,52 @@ def sonify(fbank, sr):
     pred_audio = torchaudio.transforms.GriffinLim(
         n_fft=512,
         n_iter=1000,
+        hop_length=160,
         window_fn=torch.hann_window, 
         wkwargs={'periodic':False}
         )(inverse_mel_pred)
     return pred_audio.view(1,-1).squeeze()
 
+def plot_waveform(waveform, sample_rate, title="Waveform", xlim=None, ylim=None):
+    waveform = waveform.numpy()
+
+    num_channels, num_frames = waveform.shape
+    time_axis = torch.arange(0, num_frames) / sample_rate
+
+    figure, axes = plt.subplots(num_channels, 1)
+    if num_channels == 1:
+        axes = [axes]
+    for c in range(num_channels):
+        axes[c].plot(time_axis, waveform[c], linewidth=1)
+        axes[c].grid(True)
+        if num_channels > 1:
+            axes[c].set_ylabel(f'Channel {c+1}')
+        if xlim:
+            axes[c].set_xlim(xlim)
+        if ylim:
+            axes[c].set_ylim(ylim)
+    figure.suptitle(title)
+    plt.savefig(f'{title}.png')
+
 if __name__ == '__main__':
-    waveform, sr = torchaudio.load('/Downloads/you-are-acting-so-weird.wav')
-    print(sr)
-    transform = torchaudio.transforms.Resample(sr, 16000)
-    print(waveform.size())
-    torchaudio.save('in.wav', waveform.unsqueeze(0), 16000)
+    waveform, sr = torchaudio.load('../../figure/you-are-acting-so-weird.wav')
+    new_sr = 16000
+    transform = torchaudio.transforms.Resample(sr, new_sr)
+    waveform = transform(waveform[0])
+    plot_waveform(waveform.unsqueeze(0), sample_rate=new_sr, title='in')
+    torchaudio.save('in2.wav', waveform.unsqueeze(0), new_sr)
     fbank = torchaudio.compliance.kaldi.fbank(
         waveform.unsqueeze(0),
         htk_compat=True,
-        sample_frequency=sr,
+        sample_frequency=new_sr,
         use_energy=False,
         window_type='hanning',
         num_mel_bins=128,
         dither=0.0,
         frame_shift=10,
         remove_dc_offset=False)
-    raw_audio = sonify(fbank, 16000)
-    torchaudio.save('output.wav', raw_audio, 16000)
+
+    raw_audio = sonify(fbank, new_sr)
+    plot_waveform(raw_audio.unsqueeze(0), sample_rate=new_sr, title='out')
+    torchaudio.save('output2.wav', raw_audio.unsqueeze(0), new_sr)
 
