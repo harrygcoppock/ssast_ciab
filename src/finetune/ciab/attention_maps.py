@@ -16,7 +16,8 @@ sys.path.append('../../')
 from models.ast_models import ASTModel
 import dataloader
 
-def load_trained_model(model_path, device):
+def load_trained_model(model_path, device, pretrain_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/SSAST-Base-Patch-400.pth'
+):
     args = load_args(model_path)
     args.wandb = False
     audio_model = ASTModel(
@@ -29,8 +30,7 @@ def load_trained_model(model_path, device):
             input_tdim=args.target_length,
             model_size=args.model_size,
             pretrain_stage=False,
-            load_pretrained_mdl_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/SSAST-Base-Patch-400.pth'
-            )
+            load_pretrained_mdl_path=pretrain_path)
     sd = torch.load(os.path.join(model_path, 'models/best_audio_model.pth'), map_location=device)
     if not isinstance(audio_model, torch.nn.DataParallel):
         audio_model = torch.nn.DataParallel(audio_model)
@@ -85,7 +85,7 @@ def get_attention(audio_model, loader, device, args):
     pca_proj, attention = tup_out
     return attention, fbank.cpu().transpose(1,2), pca_proj
 
-def format_attention_map(attentions, audio_model, method, args, threshold_att_maps=False, batch_num=0):
+def format_attention_map(attentions, audio_model, method, args, threshold_att_maps=True, batch_num=0):
     '''
     reshape attention so that it is the same size as orignal fbank
     '''
@@ -147,12 +147,12 @@ def plot_attentions(attensions, fbank, nh, mean, std, batch_num=0):
     for i in range(nh):
         #plot for each head
         axs[i+1].imshow(attensions[i])
-    plt.savefig('attentions4.png', bbox_inches='tight')
+    plt.savefig('attentions_0_pos.png', bbox_inches='tight')
 
 def plot_attentions_overlay(attensions, fbank, nh, mean, std, batch_num=0):
     fig, axs = plt.subplots(1,1)
     axs.imshow(fbank[batch_num])
-    color_list = ['cyan', 'brown', 'black', 'olive', 'pink', 'blue', 'green', 'lime', 'red', 'orange', 'yellow', 'purple']
+    color_list = ['cyan', 'magenta', 'darkviolet', 'olive', 'pink', 'blue', 'green', 'lime', 'red', 'orange', 'yellow', 'purple']
     for i in range(nh):
         #plot for each head
         # generate the colors for your colormap
@@ -169,10 +169,26 @@ def plot_attentions_overlay(attensions, fbank, nh, mean, std, batch_num=0):
         alphas = np.linspace(0, 0.8, cmap1.N+3)
         cmap1._lut[:,-1] = alphas
         axs.imshow(attensions[i], cmap=cmap1)
-    plt.savefig('attentions_overlay_3_covid_pos.png', bbox_inches='tight')
-#def reverse_mel(fbank):
-#    audio = librosa.feature.inverse.mel_to_audio(fbank, sr=16000)
-#    print(audio)
+    plt.savefig('attentions_overlay_0_covid_pos.png', bbox_inches='tight')
+
+
+def logits_per_patch(audio_model, device, pca_proj):
+    audio_model = audio_model.to(device)
+    audio_model.eval()
+    with torch.no_grad():
+        logits = torch.nn.functional.softmax(audio_model.module.mlp_head(pca_proj[0,:,:]))
+        print(logits)
+        #for i in range(pca_proj.size()[1]):
+        #    logits.append(torch.nn.functional.softmax(audio_model.module.mlp_head(pca_proj[-4,i,:])))
+    print(logits)
+    logits = logits[:,1] - logits[:,0]
+    print(logits)
+    #logits = [x[1] - x[0] for x in logits]
+    #logits = [x.cpu().numpy() for x in logits]
+    logits = logits[2:].tolist()
+    plt.figure()
+    plt.plot(range(0, len(logits)), logits)
+    plt.savefig('logits_positive_frame.png')
 
 def main(model_path, method='patch'):
 
@@ -184,23 +200,28 @@ def main(model_path, method='patch'):
         args.loss_fn = torch.nn.CrossEntropyLoss()
     eval_dataset, eval_loader = get_dataset(args)   
     attention, fbank, pca_proj = get_attention(audio_model, eval_loader, device, args)
-    attentions, nh = format_attention_map(attention, audio_model, method, args)
-    plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=13)
-    plot_attentions_overlay(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=13)
+    attentions, nh = format_attention_map(attention, audio_model, method, args, threshold_att_maps=False, batch_num=0)
+    fig, axs = plt.subplots(1,1)
+    plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=0, axs)
+    plt.savefig()
+    plt.close()
+
+    fig, axs = plt.subplots(2,1, sharex=True)
+    attentions, nh = format_attention_map(attention, audio_model, method, args, threshold_att_maps=True, batch_num=0)
+    plot_attentions_overlay(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=0, axs[0])
     #get logits per time step
     print(pca_proj.size())
-    logits = []
-    audio_model = audio_model.to(device)
-    audio_model.eval()
-    with torch.no_grad():
-        for i in range(pca_proj.size()[1]):
-            logits.append(torch.nn.functional.softmax(audio_model.module.mlp_head(pca_proj[2,i,:])))
-    print(logits)
-    logits = [x[1] - x[0] for x in logits]
-    logits = [x.cpu().numpy() for x in logits]
-    plt.figure()
-    plt.plot(range(0, len(logits)), logits)
-    plt.savefig('logits_positive.png')
+    print(args)
+    audio_model, args = load_trained_model('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train-final/fold1', device, pretrain_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/SSAST-Base-Frame-400.pth'
+)
+    if args.loss == 'BCE':
+        args.loss_fn = torch.nn.BCEWithLogitsLoss()
+    elif args.loss == 'CE':
+        args.loss_fn = torch.nn.CrossEntropyLoss()
+    eval_dataset, eval_loader = get_dataset(args)
+    attention, fbank, pca_proj = get_attention(audio_model, eval_loader, device, args)
+    logits_per_patch(audio_model, device, pca_proj, axs[1])
+
 
 if __name__ == '__main__':
     main('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')
