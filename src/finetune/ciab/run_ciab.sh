@@ -30,8 +30,8 @@ then
 	dataset_std=6.1568
 elif [ "$dataset" == ciab_sentence ]
 then	
-	dataset_mean=-7.8382
-	dataset_std=5.4489
+	dataset_mean=-7.8560
+	dataset_std=5.4546
 elif [ "$dataset" == ciab_ha_sound ]
 then
 	dataset_mean=-8.8335
@@ -60,7 +60,7 @@ model_size=base
 head_lr=1
 fold=1
 pretrain_path=./${pretrain_model}.pth
-base_exp_dir=./exp/test01-${dataset}-f${fstride}-${fshape}-t${tstride}-${tshape}-b${batch_size}-lr${lr}-${task}-${model_size}-${pretrain_exp}-${pretrain_model}-${head_lr}x-noise${noise}-standard-train-final2
+base_exp_dir=./exp/final/test01-${dataset}-f${fstride}-${fshape}-t${tstride}-${tshape}-b${batch_size}-lr${lr}-${task}-${model_size}-${pretrain_exp}-${pretrain_model}-${head_lr}x-noise${noise}-standard-train-final2
 
 echo 'now process fold'${fold}
 
@@ -68,16 +68,14 @@ exp_dir=${base_exp_dir}/fold${fold}
 
 train_data=./data/datafiles/audio_sentence_url/ciab_train_data_${fold}.json
 validation_data=./data/datafiles/audio_sentence_url/ciab_validation_data_${fold}.json
-standard_test_data=./data/datafiles/audio_sentence_url/ciab_standard_test_data_${fold}.json
+standard_test_data=./data/datafiles/audio_sentence_url/ciab_test_data_${fold}.json
 matched_test_data=./data/datafiles/audio_sentence_url/ciab_matched_test_data_${fold}.json
-matched_train_data=./data/datafiles/audio_sentence_url/ciab_matched_train_data_${fold}.json
-matched_validation_data=./data/datafiles/audio_sentence_url/ciab_matched_validation_data_${fold}.json
+matched_train_data=./data/datafiles/audio_sentence_url/ciab_matched_train_list${fold}.json
+matched_validation_data=./data/datafiles/audio_sentence_url/ciab_matched_validation_list${fold}.json
 long_test_data=./data/datafiles/audio_sentence_url/ciab_long_test_data_${fold}.json
 naive_train_data=./data/datafiles/audio_sentence_url/naive_train_${fold}.json
 naive_validation_data=./data/datafiles/audio_sentence_url/naive_validation_${fold}.json
 naive_test_data=./data/datafiles/audio_sentence_url/naive_test_${fold}.json
-big_train_data=./data/datafiles/audio_sentence_url/big_train_${fold}.json
-big_validation_data=./data/datafiles/audio_sentence_url/big_validation_${fold}.json
 
 # standard train
 CUDA_CACHE_DISABLE=1 python -W ignore ../../run.py --dataset ${dataset} \

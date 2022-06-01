@@ -10,6 +10,7 @@
 *.pkl
 *.png
 *.npy
+src/finetune/ciab/data/ciab/*
 /src/finetune/ciab/wandb/*
 figure/*
 !figure/10854_ssast.pdf

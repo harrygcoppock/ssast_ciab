@@ -4,7 +4,7 @@
 # @Email   : harry.coppock@imperial.ac.uk
 # @File    : calculate_mean_std.py
 import sys
-sys.path.append('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast/src/')
+sys.path.append('../../')
 from dataloader import AudioDataset
 import torch
 import numpy as np
@@ -40,11 +40,18 @@ if __name__ == '__main__':
             'calc_mean_std': True,
             'mode': 'train'}
 
-    dataset = AudioDataset(
-            './data/datafiles/audio_ha_sound_url/ciab_train_data_1.json',
-            label_csv='./data/ciab_class_labels_indices.csv',
-            audio_conf=audio_conf
-            )
-    dataset_mean, dataset_std = calc_mean_std(dataset)
-    print('mean: ', dataset_mean)
-    print('std: ', dataset_std)
+
+    POSSIBLE_MODALITIES = ['audio_sentence_url']#,
+                           #'audio_ha_sound_url',
+                           #'audio_cough_url',
+                           #'audio_three_cough_url']
+    for modality in POSSIBLE_MODALITIES: 
+        dataset = AudioDataset(
+                f'./data/datafiles/{modality}/ciab_train_data_1.json',
+                label_csv='./data/ciab_class_labels_indices.csv',
+                audio_conf=audio_conf
+                )
+        dataset_mean, dataset_std = calc_mean_std(dataset)
+        print('modality: ', modality)
+        print('mean: ', dataset_mean)
+        print('std: ', dataset_std)
