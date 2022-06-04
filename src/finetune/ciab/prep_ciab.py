@@ -60,6 +60,8 @@ class PrepCIAB():
         self.iterate_through_files(self.test, 'test')
         print('Beginining ciab long test prepocessing')
         self.iterate_through_files(self.long, 'long_test') 
+        print('Beginining ciab long matched test prepocessing')
+        self.iterate_through_files(self.long_matched, 'long_test') 
         print('Beginining ciab matched test prepocessing')
         self.iterate_through_files(self.matched_test, 'matched_test') 
         print('Beginining ciab matched_train prepocessing')
@@ -111,6 +113,7 @@ class PrepCIAB():
         self.val = self.meta[self.meta['splits'] == 'val'].audio_sentence.tolist()
         self.test = self.meta[self.meta['splits'] == 'test'].audio_sentence.tolist()
         self.long = self.meta[self.meta['splits'] == 'long'].audio_sentence.tolist()
+        self.long_matched = self.meta[self.meta['in_matched_rebalanced_test'] == True].audio_sentence.tolist()
 
         self.matched_train = self.meta[self.meta['matched_train_splits'] == 'matched_train'].audio_sentence.tolist()
         self.matched_validation = self.meta[self.meta['matched_train_splits'] == 'matched_validation'].audio_sentence.tolist()
@@ -188,6 +191,7 @@ class PrepCIAB():
         dic_matched_train_list = self.list_to_dict(self.matched_train, 'matched_train')
         dic_matched_validation_list = self.list_to_dict(self.matched_validation, 'matched_validation')
         dic_long_test_list = self.list_to_dict(self.long, 'long_test')
+        dic_long_matched_test_list = self.list_to_dict(self.long_matched, 'long_matched')
         dic_naive_train_list = self.list_to_dict(self.naive_train, 'naive_train')
         dic_naive_validation_list = self.list_to_dict(self.naive_validation, 'naive_validation')
         dic_naive_test_list = self.list_to_dict(self.naive_test, 'naive_test')
@@ -207,6 +211,8 @@ class PrepCIAB():
             json.dump({'data': dic_test_list}, f, indent=1)
         with open(f'./data/datafiles/{self.modality}/ciab_long_test_data_'+ str(fold) +'.json', 'w') as f:
             json.dump({'data': dic_long_test_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/ciab_long_matched_data_'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_long_matched_test_list}, f, indent=1)
         with open(f'./data/datafiles/{self.modality}/ciab_matched_test_data_'+ str(fold) +'.json', 'w') as f:
             json.dump({'data': dic_matched_test_list}, f, indent=1)
         with open(f'./data/datafiles/{self.modality}/dic_matched_validation_list'+ str(fold) +'.json', 'w') as f:
@@ -319,7 +325,7 @@ class PrepCIAB():
         return [x['wav'] for x in list_dic]
 
 if __name__ == '__main__':
-    for modality in ['audio_sentence_url']:#,'audio_ha_sound_url', 'audio_cough_url', 'audio_three_cough_url']:
+    for modality in ['audio_sentence_url','audio_ha_sound_url', 'audio_cough_url', 'audio_three_cough_url']:
 
 
         ciab = PrepCIAB(modality)
