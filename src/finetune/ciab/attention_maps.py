@@ -5,6 +5,7 @@ Qs: harry.coppock@imperial.ac.uk
 '''
 import torch
 import torch.nn as nn
+import torchaudio
 import pickle
 import os
 import sys
@@ -12,6 +13,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import colorConverter
+import cv2
 sys.path.append('../../')
 from models.ast_models import ASTModel
 import dataloader
@@ -83,7 +85,7 @@ def get_attention(audio_model, loader, device, args):
             return_attention=True
             )
     pca_proj, attention = tup_out
-    return attention, fbank.cpu().transpose(1,2), pca_proj
+    return attention, fbank.cpu().transpose(1,2), pca_proj, index
 
 def format_attention_map(attentions, audio_model, method, args, threshold_att_maps=False, batch_num=0):
     '''
@@ -170,9 +172,73 @@ def plot_attentions_overlay(attensions, fbank, nh, mean, std, batch_num=0):
         cmap1._lut[:,-1] = alphas
         axs.imshow(attensions[i], cmap=cmap1)
     plt.savefig('attentions_overlay_3_covid_pos.png', bbox_inches='tight')
-#def reverse_mel(fbank):
-#    audio = librosa.feature.inverse.mel_to_audio(fbank, sr=16000)
-#    print(audio)
+
+
+def convert_attention_map(attention, spectrum):
+    '''
+    given the coords of the attention map for the fbank, project onto the spectrum
+    '''
+    width, height = spectrum.size()[1]+1, spectrum.size()[0]+1
+    res = cv2.resize(attention, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
+    return res
+
+def sonfiy_attention(attention, index, eval_dataset):
+    '''
+    given the attetion map sonficy the attention portions
+    '''
+    datum = eval_dataset.data[index]
+    filename = datum['wav']
+    waveform, sr = torchaudio.load(filename)
+    spectrum, window_shift, window_size = spectrogram_rep(waveform)
+    attention = convert_attention_map(attention, spectrum)
+
+    # now only keep the sections of the spectrogram which the model
+    # paid attention to
+
+    spectrum_att = spectrum * attention
+    t = torchaudio.transforms.InverseSpectrogram(n_fft=512,
+                                         win_length=window_size,
+                                         hop_length=window_shift)
+
+    att_wav = t(spectrum_att.T)
+    torchaudio.save('atten_recon.wav', att_wav.view(1,-1), 16000)
+
+
+def spectrogram_rep(waveform):
+    '''
+    mimic the spectrogram step in torchaudio fbank
+    '''
+    waveform, window_shift, window_size, padded_window_size = torchaudio.compliance.kaldi._get_waveform_and_window_properties(
+        waveform,
+        channel=0,
+        sample_frequency=16000,
+        frame_shift=10.0,
+        frame_length=25.0,
+        round_to_power_of_two=True,
+        preemphasis_coefficient=0.97)
+
+    # strided_input, size (m, padded_window_size) and signal_log_energy, size (m)
+    strided_input, signal_log_energy = torchaudio.compliance.kaldi._get_window(
+        waveform,
+        padded_window_size,
+        window_size,
+        window_shift,
+        window_type='hanning',
+        blackman_coeff=0.42,
+        snip_edges=True,
+        raw_energy=True,
+        energy_floor=1.0,
+        dither=0.0,
+        remove_dc_offset=True,
+        preemphasis_coefficient=0.97
+    )
+
+    # size (m, padded_window_size // 2 + 1)
+    spectrum = torch.fft.rfft(strided_input)
+
+    return spectrum, window_shift, window_size
+
+
 
 def main(model_path, method='patch'):
 
@@ -183,7 +249,7 @@ def main(model_path, method='patch'):
     elif args.loss == 'CE':
         args.loss_fn = torch.nn.CrossEntropyLoss()
     eval_dataset, eval_loader = get_dataset(args)   
-    attention, fbank, pca_proj = get_attention(audio_model, eval_loader, device, args)
+    attention, fbank, pca_proj, index = get_attention(audio_model, eval_loader, device, args)
     attentions, nh = format_attention_map(attention, audio_model, method, args)
     plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=13)
     plot_attentions_overlay(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=13)
@@ -201,6 +267,8 @@ def main(model_path, method='patch'):
     plt.figure()
     plt.plot(range(0, len(logits)), logits)
     plt.savefig('logits_positive.png')
+
+    sonfiy_attention(attention, index, eval_dataset)
 
 if __name__ == '__main__':
     main('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')
