@@ -30,14 +30,9 @@ class PrepCIAB():
                            'audio_three_cough_url']
 
     PATHS = {
-            'pre_june_meta': 'combined-results/submissions/study_data_v6_pre_jun_11012022.pkl',
-            'post_june_meta': 'combined-results/submissions/study_data_v6_post_jun_11012022.pkl',
+            'meta': 'train-test-split/final_objects/meta_data_v5.csv',
             'meta_bucket': 'ciab-879281191186-prod-s3-pii-ciab-wip',
             'audio_bucket': 'ciab-879281191186-prod-s3-pii-ciab-approved',
-            'splits': 'train-test-split/train_test_split_final_audiosentence_v6_final.pkl',
-            'matched': 'audio_sentences_for_matching/test_set_matched_audio_sentences_v6_final.csv',
-            'matched_train': 'audio_sentences_for_matching/train_set_matched_audio_sentences_v6_final.csv',
-            'longitudinal': 'train-test-split/LongitudinalTestSet.csv'
             }
     RANDOM_SEED = 42
 
@@ -45,27 +40,54 @@ class PrepCIAB():
         self.modality = self.check_modality(modality)
         self.bucket_meta = self.get_bucket(self.PATHS['meta_bucket'])
         self.bucket_audio = self.get_bucket(self.PATHS['audio_bucket'])
-        self.meta_data, self.train, self.test, self.long_test, self.matched_test, self.matched_train = self.load_train_test_splits()
+        self.meta = pd.read_csv(self.get_file(
+                                            self.PATHS['meta'],
+                                            self.bucket_meta))
+        self.load_splits()
         # base directory for audio files
-        self.output_base= f'./data/ciab/{self.modality}'
-        self.create_folds()
+        self.output_base= f'./data/ciab/final/{self.modality}'
+        self.error_list = []
 
     def main(self):
         if not os.path.exists(self.output_base):
             os.makedirs(self.output_base)
             
-        print('creating json')
-        self.create_json()
         print('Beginining ciab train prepocessing')
         self.iterate_through_files(self.train, 'train')
+        print('Beginining ciab validation prepocessing')
+        self.iterate_through_files(self.val, 'val')
         print('Beginining ciab test prepocessing')
         self.iterate_through_files(self.test, 'test')
         print('Beginining ciab long test prepocessing')
-        self.iterate_through_files(self.long_test, 'long_test') 
+        self.iterate_through_files(self.long, 'long_test') 
+        print('Beginining ciab long matched test prepocessing')
+        self.iterate_through_files(self.long_matched, 'long_test') 
         print('Beginining ciab matched test prepocessing')
         self.iterate_through_files(self.matched_test, 'matched_test') 
         print('Beginining ciab matched_train prepocessing')
         self.iterate_through_files(self.matched_train, 'matched_train')
+        print('Beginining ciab matched_validation prepocessing')
+        self.iterate_through_files(self.matched_validation, 'matched_validation')
+        print('Beginining ciab naive train prepocessing')
+        self.iterate_through_files(self.naive_train, 'naive_train')
+        print('Beginining ciab naive validation prepocessing')
+        self.iterate_through_files(self.naive_validation, 'naive_validation')
+        print('Beginining ciab naive test prepocessing')
+        self.iterate_through_files(self.naive_test, 'naive_test')
+        print('Beginining ciab original train prepocessing')
+        self.iterate_through_files(self.train_original, 'train_original')
+        print('Beginining ciab original test prepocessing')
+        self.iterate_through_files(self.test_original, 'test_original')
+        print('Beginining ciab matched test prepocessing')
+        self.iterate_through_files(self.matched_test_original, 'matched_test_original') 
+        print('Beginining ciab matched_train prepocessing')
+        self.iterate_through_files(self.matched_train_original, 'matched_train_original')
+        print('Beginining ciab matched_validation prepocessing')
+        self.iterate_through_files(self.matched_validation_original, 'matched_validation_original')
+        with open(f'{self.output_base}/audio_16k/errorlist.txt', "w") as output:
+            output.write(str(self.error_list))
+        print('creating json')
+        self.create_json()
 
     def check_modality(self, modality):
         if modality not in self.POSSIBLE_MODALITIES:
@@ -83,57 +105,53 @@ class PrepCIAB():
     def get_file(self, path, bucket):
         return io.BytesIO(bucket.Object(path).get()['Body'].read())
 
-    def load_train_test_splits(self):
+    def load_splits(self):
         '''
         Loads the train and test barcode splits and the corresponding meta_data
         '''
+        self.train = self.meta[self.meta['splits'] == 'train'].audio_sentence.tolist()
+        self.val = self.meta[self.meta['splits'] == 'val'].audio_sentence.tolist()
+        self.test = self.meta[self.meta['splits'] == 'test'].audio_sentence.tolist()
+        self.long = self.meta[self.meta['splits'] == 'long'].audio_sentence.tolist()
+        self.long_matched = self.meta[self.meta['in_matched_rebalanced_test'] == True].audio_sentence.tolist()
 
-        train_test = pd.read_pickle(self.get_file(
-                                        self.PATHS['splits'],
-                                         self.bucket_meta))
-        pre_june_meta_data = pd.read_pickle(self.get_file(
-                                        self.PATHS['pre_june_meta'],
-                                        self.bucket_meta))
-        post_june_meta_data = pd.read_pickle(self.get_file(
-                                        self.PATHS['post_june_meta'],
-                                        self.bucket_meta))
-        meta_data = pd.concat([
-                            pre_june_meta_data,
-                            post_june_meta_data
-                            ])
-        
-        long_test = pd.read_csv(self.get_file(
-                            self.PATHS['longitudinal'],
-                            self.bucket_meta))
+        self.matched_train = self.meta[self.meta['matched_train_splits'] == 'matched_train'].audio_sentence.tolist()
+        self.matched_validation = self.meta[self.meta['matched_train_splits'] == 'matched_validation'].audio_sentence.tolist()
+        self.matched_test = self.meta[self.meta['in_matched_rebalanced_test'] == True].audio_sentence.tolist()
 
-        matched_test = pd.read_csv(self.get_file(
-                                    self.PATHS['matched'],
-                                    self.bucket_meta),
-                                    names=['id'])
-        matched_train = pd.read_csv(self.get_file(
-                                    self.PATHS['matched_train'],
-                                    self.bucket_meta),
-                                    names=['id'])
+        self.naive_train = self.meta[self.meta['naive_splits'] == 'train'].audio_sentence.tolist()
+        self.naive_validation = self.meta[self.meta['naive_splits'] == 'validation'].audio_sentence.tolist()
+        self.naive_test = self.meta[self.meta['naive_splits'] == 'test'].audio_sentence.tolist()
 
-        return meta_data, train_test['train'], train_test['test'], long_test['audio_sentence'].tolist(), matched_test['id'].tolist(), matched_train['id'].tolist()
+        self.train_original = self.meta[self.meta['original_splits'] == 'train'].audio_sentence.tolist()
+        self.val_original = self.meta[self.meta['original_splits'] == 'val'].audio_sentence.tolist()
+        self.test_original = self.meta[self.meta['original_splits'] == 'test'].audio_sentence.tolist()
 
+        self.matched_train_original = self.meta[self.meta['matched_original_train_splits'] == 'matched_train'].audio_sentence.tolist()
+        self.matched_validation_original = self.meta[self.meta['matched_original_train_splits'] == 'matched_validation'].audio_sentence.tolist()
+        self.matched_test_original = self.meta[self.meta['in_matched_original_test'] == True].audio_sentence.tolist()
 
     def iterate_through_files(self, dataset, split='train'):
         if not os.path.exists(f'{self.output_base}/audio_16k/{split}'):
             os.makedirs(f'{self.output_base}/audio_16k/{split}')
-        self.error_list = []
         self.tot_removed = [] 
         bootstrap_results = Parallel(n_jobs=-1, verbose=10, prefer='threads')(delayed(self.process_file)(barcode_id, split) for barcode_id in dataset)
         
         print(f'Average fraction removed: {np.mean(self.tot_removed)}')
         
-        with open(f'{self.output_base}/audio_16k/{split}/errorlist.txt', "w") as output:
-            output.write(str(self.error_list))
 
     def process_file(self, barcode_id, split):
 
-        df_match = self.meta_data[self.meta_data['audio_sentence'] == barcode_id]
+        df_match = self.meta[self.meta['audio_sentence'] == barcode_id]
         assert len(df_match) != 0, 'This unique code does not exist in the meta data file currently loaded - investigate!'
+
+        if df_match['audio_sentence_size'].iloc[0] <= 44 or df_match['audio_ha_sound_size'].iloc[0] <= 44 or df_match['audio_cough_size'].iloc[0] <= 44 or df_match['audio_three_cough_size'].iloc[0] <= 44:
+            self.error_list.append(df_match[self.modality].iloc[0])
+            return 1
+
+        if df_match['test_result'].iloc[0] == 'Unknown/Void':
+            self.error_list.append(df_match[self.modality].iloc[0])
+            return 1
         try:
             filename = self.get_file(df_match[self.modality].iloc[0], self.bucket_audio)
         except:
@@ -145,7 +163,7 @@ class PrepCIAB():
             signal, sr = librosa.load(filename, sr=16000)
         except:
             print(f"{filename} not possible to load. From {df_match['processed_date']} Total so far: {len(self.error_list)}")
-            self.error_list.append(filename)
+            self.error_list.append(df_match[self.modality].iloc[0])
             return 1
         clipped_signal, frac_removed = self.remove_silence(signal, barcode_id)
         self.tot_removed.append(frac_removed)
@@ -154,72 +172,74 @@ class PrepCIAB():
 
     def print_stats(self):
         print(f'Sample numbers: Train: {len(self.train)}, \
+                Validation: {len(self.val)} \
                 Test: {len(self.test)}, \
-                Long_test: {len(self.long_test)} \
+                Long_test: {len(self.long)} \
                 matched_test: {len(self.matched_test)} \
+                matched_train: {len(self.matched_train)} \
+                matched_val: {len(self.matched_validation)} \
                 naive train: {len(self.naive_train)} \
-                naive validation: {len(self.naive_val)} \
+                naive validation: {len(self.naive_validation)} \
                 naive test: {len(self.naive_test)}')
     
-    def create_folds(self):
-        kfold = KFold(n_splits=5, shuffle=True, random_state=self.RANDOM_SEED)
-        self.folds = [[self.train[idx] for idx in test]
-                 for (train, test) in kfold.split(self.train)]
-
-        self.matched_train_folds = [[self.matched_train[idx] for idx in test]
-                 for (train, test) in kfold.split(self.matched_train)]
     def create_json(self):
-        #for fold in tqdm([1,2,3,4,5]):# for compute reasons have a fixed validation set when evaluating on test sets
         fold = 1
-        train_list = [instance for instance in self.train if instance not in self.folds[fold-1]]
-        validation_list = [instance for instance in self.train if instance in self.folds[fold-1]]
-        assert not any(x in validation_list for x in train_list), 'there is cross over between train and validation'
-        dic_train_list = self.list_to_dict(train_list, 'train')
-        dic_validation_list = self.list_to_dict(validation_list, 'train')
+        dic_train_list = self.list_to_dict(self.train, 'train')
+        dic_validation_list = self.list_to_dict(self.val, 'validation')
         dic_test_list = self.list_to_dict(self.test, 'test')
         dic_matched_test_list = self.list_to_dict(self.matched_test, 'matched_test')
         dic_matched_train_list = self.list_to_dict(self.matched_train, 'matched_train')
-        dic_long_test_list = self.list_to_dict(self.long_test, 'long_test')
+        dic_matched_validation_list = self.list_to_dict(self.matched_validation, 'matched_validation')
+        dic_long_test_list = self.list_to_dict(self.long, 'long_test')
+        dic_long_matched_test_list = self.list_to_dict(self.long_matched, 'long_matched')
+        dic_naive_train_list = self.list_to_dict(self.naive_train, 'naive_train')
+        dic_naive_validation_list = self.list_to_dict(self.naive_validation, 'naive_validation')
+        dic_naive_test_list = self.list_to_dict(self.naive_test, 'naive_test')
+
+        dic_train_original_list = self.list_to_dict(self.train_original, 'train_original')
+        dic_validation_original_list = self.list_to_dict(self.val_original, 'train_original')
+        dic_test_original_list = self.list_to_dict(self.test_original, 'test_original')
+        dic_matched_test_original_list = self.list_to_dict(self.matched_test_original, 'matched_test_original')
+        dic_matched_train_original_list = self.list_to_dict(self.matched_train_original, 'matched_train_original')
+        dic_matched_validation_original_list = self.list_to_dict(self.matched_validation_original, 'matched_validation_original')
+
         with open(f'./data/datafiles/{self.modality}/ciab_train_data_'+ str(fold) +'.json', 'w') as f:
             json.dump({'data': dic_train_list}, f, indent=1)
         with open(f'./data/datafiles/{self.modality}/ciab_validation_data_'+ str(fold) +'.json', 'w') as f:
             json.dump({'data': dic_validation_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_standard_test_data_'+ str(fold) +'.json', 'w') as f:
+        with open(f'./data/datafiles/{self.modality}/ciab_test_data_'+ str(fold) +'.json', 'w') as f:
             json.dump({'data': dic_test_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_matched_test_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_matched_test_list}, f, indent=1)
         with open(f'./data/datafiles/{self.modality}/ciab_long_test_data_'+ str(fold) +'.json', 'w') as f:
             json.dump({'data': dic_long_test_list}, f, indent=1)
-        # create naive training evaluation sets. Note: this is for an ablation study to show the inflated performance
-        all_data = dic_train_list + dic_validation_list + dic_test_list + dic_long_test_list # matched test and matched train are subsets of test and train respectively
-        self.naive_train, self.naive_val, self.naive_test = self.create_naive_splits(all_data)
-
-        assert not any(x in self.back_to_list(self.naive_val) for x in self.naive_train), 'there is cross over between naive train and naive validation'
-        assert not any(x in self.back_to_list(self.naive_test) for x in self.naive_train), 'there is cross over between naive train and naive test'
-        assert not any(x in self.back_to_list(self.naive_test) for x in self.naive_val), 'there is cross over between naive test and naive validation'
+        with open(f'./data/datafiles/{self.modality}/ciab_long_matched_data_'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_long_matched_test_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/ciab_matched_test_data_'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_matched_test_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/dic_matched_validation_list'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_matched_validation_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/dic_matched_train_list'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_matched_train_list}, f, indent=1)
         with open(f'./data/datafiles/{self.modality}/naive_train_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': self.naive_train}, f, indent=1)
+            json.dump({'data': dic_naive_train_list}, f, indent=1)
         with open(f'./data/datafiles/{self.modality}/naive_validation_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': self.naive_val}, f, indent=1)
+            json.dump({'data': dic_naive_validation_list}, f, indent=1)
         with open(f'./data/datafiles/{self.modality}/naive_test_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': self.naive_test}, f, indent=1)
-        # Here we create an additional training set where we add the longitudinal data to the train
-        big_train = dic_train_list + dic_validation_list + dic_long_test_list 
-        self.big_train, self.big_val = self.create_naive_splits(big_train, just_val=True) 
-        with open(f'./data/datafiles/{self.modality}/big_train_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': self.big_train}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/big_validation_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': self.big_val}, f, indent=1)
-        # matched train and validation
-        matched_train_list = [instance for instance in self.matched_train if instance not in self.matched_train_folds[fold-1]]
-        matched_validation_list = [instance for instance in self.matched_train if instance in self.matched_train_folds[fold-1]]
-        assert not any(x in matched_validation_list for x in matched_train_list), 'there is cross over between matched train and validation'
-        matched_dic_train_list = self.list_to_dict(matched_train_list, 'train')
-        matched_dic_validation_list = self.list_to_dict(matched_validation_list, 'train')
-        with open(f'./data/datafiles/{self.modality}/ciab_matched_train_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': matched_dic_train_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_matched_validation_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': matched_dic_validation_list}, f, indent=1)
+            json.dump({'data': dic_naive_test_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/ciab_train_original_data_'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_train_original_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/ciab_validation_original_data_'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_validation_original_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/ciab_test_original_data_'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_test_original_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/ciab_matched_test_original_data_'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_matched_test_original_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/dic_matched_validation_original_list'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_matched_validation_original_list}, f, indent=1)
+        with open(f'./data/datafiles/{self.modality}/dic_matched_train_original_list'+ str(fold) +'.json', 'w') as f:
+            json.dump({'data': dic_matched_train_original_list}, f, indent=1)
+    
+    
+    
     def list_to_dict(self, data, split):
         '''
         THe ssast library requires a json file in the following format
@@ -241,7 +261,13 @@ class PrepCIAB():
             ]
         }
         '''
-        formatted_list = [{"wav": f'{self.output_base}/audio_16k/{split}/{instance}', "labels": self.meta_data[self.meta_data['audio_sentence'] == instance].test_result.iloc[0]} for instance in data]
+        #note the additional check for checking if the audio file is faulty. These samples are included in the exp
+        # as participants submitted 4 recordings and we do not disregard them even if one recording is missing.
+        if len(self.error_list) == 0:
+            formatted_list = [{"wav": f'{self.output_base}/audio_16k/{split}/{instance}', "labels": self.meta[self.meta['audio_sentence'] == instance].test_result.iloc[0]} for instance in data]
+            return formatted_list
+        error_list = [self.meta[self.meta[self.modality] == instance].audio_sentence.iloc[0] for instance in self.error_list]
+        formatted_list = [{"wav": f'{self.output_base}/audio_16k/{split}/{instance}', "labels": self.meta[self.meta['audio_sentence'] == instance].test_result.iloc[0]} for instance in data if instance not in error_list]
         return formatted_list
 
     def remove_silence(self, signal, filename):
@@ -299,6 +325,9 @@ class PrepCIAB():
         return [x['wav'] for x in list_dic]
 
 if __name__ == '__main__':
-    ciab = PrepCIAB('audio_ha_sound_url')
-    ciab.main()
-    ciab.print_stats()
+    for modality in ['audio_sentence_url','audio_ha_sound_url', 'audio_cough_url', 'audio_three_cough_url']:
+
+
+        ciab = PrepCIAB(modality)
+        ciab.main()
+        ciab.print_stats()
