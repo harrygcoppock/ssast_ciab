@@ -41,10 +41,10 @@ if __name__ == '__main__':
             'mode': 'train'}
 
 
-    POSSIBLE_MODALITIES = ['audio_sentence_url']#,
-                           #'audio_ha_sound_url',
-                           #'audio_cough_url',
-                           #'audio_three_cough_url']
+    POSSIBLE_MODALITIES = ['audio_sentence_url',
+                           'audio_ha_sound_url',
+                           'audio_cough_url',
+                           'audio_three_cough_url']
     for modality in POSSIBLE_MODALITIES: 
         dataset = AudioDataset(
                 f'./data/datafiles/{modality}/ciab_train_data_1.json',
