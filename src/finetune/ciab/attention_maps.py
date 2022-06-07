@@ -13,12 +13,11 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import colorConverter
-import cv2
 sys.path.append('../../')
 from models.ast_models import ASTModel
 import dataloader
 
-def load_trained_model(model_path, device, pretrain_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/SSAST-Base-Patch-400.pth'
+def load_trained_model(model_path, device, pretrain_path='/workspace/ssast_ciab/src/finetune/ciab/SSAST-Base-Patch-400.pth'
 ):
     args = load_args(model_path)
     args.wandb = False
@@ -45,7 +44,7 @@ def load_args(model_path):
         print(args)
     return args
 
-def get_dataset(args, path_data='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/data/datafiles/audio_sentence_url/ciab_standard_test_data_1.json'):
+def get_dataset(args, path_data='/workspace/ssast_ciab/src/finetune/ciab/data/datafiles/audio_sentence_url/ciab_test_data_1.json'):
     print(os.path.exists(path_data))
     val_audio_conf = {
             'num_mel_bins': args.num_mel_bins, 
@@ -60,7 +59,7 @@ def get_dataset(args, path_data='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssa
             }
     eval_dataset = dataloader.AudioDataset(
         path_data,
-        label_csv='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/data/ciab_class_labels_indices.csv',
+        label_csv='/workspace/ssast_ciab/src/finetune/ciab/data/ciab_class_labels_indices.csv',
         audio_conf=val_audio_conf,
         pca_proj=True)
     eval_loader = torch.utils.data.DataLoader(
@@ -151,8 +150,7 @@ def plot_attentions(attensions, fbank, nh, mean, std, batch_num=0):
         axs[i+1].imshow(attensions[i])
     plt.savefig('attentions_0_pos.png', bbox_inches='tight')
 
-def plot_attentions_overlay(attensions, fbank, nh, mean, std, batch_num=0):
-    fig, axs = plt.subplots(1,1)
+def plot_attentions_overlay(attensions, fbank, nh, mean, std, batch_num=0, axs=None):
     axs.imshow(fbank[batch_num])
     color_list = ['cyan', 'magenta', 'darkviolet', 'olive', 'pink', 'blue', 'green', 'lime', 'red', 'orange', 'yellow', 'purple']
     for i in range(nh):
@@ -209,12 +207,14 @@ def sonfiy_attention(attention, index, eval_dataset):
     filename = datum['wav']
     waveform, sr = torchaudio.load(filename)
     spectrum, window_shift, window_size = spectrogram_rep(waveform)
+    print(attention)
     attention = convert_attention_map(attention, spectrum)
 
     # now only keep the sections of the spectrogram which the model
     # paid attention to
 
     spectrum_att = spectrum * attention
+    print(spectrum_att)
     t = torchaudio.transforms.InverseSpectrogram(n_fft=512,
                                          win_length=window_size,
                                          hop_length=window_shift)
@@ -269,19 +269,18 @@ def main(model_path, method='patch'):
 
     attention, fbank, pca_proj, index = get_attention(audio_model, eval_loader, device, args)
     attentions, nh = format_attention_map(attention, audio_model, method, args, threshold_att_maps=False, batch_num=0)
-    fig, axs = plt.subplots(1,1)
-    plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=0, axs)
-    plt.savefig()
+    plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=0)
     plt.close()
 
     fig, axs = plt.subplots(2,1, sharex=True)
     attentions, nh = format_attention_map(attention, audio_model, method, args, threshold_att_maps=True, batch_num=0)
-    plot_attentions_overlay(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=0, axs[0])
+    plot_attentions_overlay(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=0, axs=axs[0])
+    sonfiy_attention(attentions, index, eval_dataset)
 
     #get logits per time step
     print(pca_proj.size())
     print(args)
-    audio_model, args = load_trained_model('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train-final/fold1', device, pretrain_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/SSAST-Base-Frame-400.pth'
+    audio_model, args = load_trained_model('/workspace/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train-final/fold1', device, pretrain_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/SSAST-Base-Frame-400.pth'
 )
     if args.loss == 'BCE':
         args.loss_fn = torch.nn.BCEWithLogitsLoss()
@@ -292,7 +291,6 @@ def main(model_path, method='patch'):
     logits_per_patch(audio_model, device, pca_proj, axs[1])
 
 
-    sonfiy_attention(attention, index, eval_dataset)
 
 if __name__ == '__main__':
-    main('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')
+    main('/workspace/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')
