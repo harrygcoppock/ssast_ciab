@@ -30,7 +30,7 @@ class PrepCIAB():
                            'audio_three_cough_url']
 
     PATHS = {
-            'meta': 'train-test-split/final_objects/meta_data_v5.csv',
+            'meta': 'train-test-split/final_objects/meta_data_v3_a.csv',
             'meta_bucket': 'ciab-879281191186-prod-s3-pii-ciab-wip',
             'audio_bucket': 'ciab-879281191186-prod-s3-pii-ciab-approved',
             }
@@ -52,41 +52,43 @@ class PrepCIAB():
         if not os.path.exists(self.output_base):
             os.makedirs(self.output_base)
             
-        print('Beginining ciab train prepocessing')
-        self.iterate_through_files(self.train, 'train')
-        print('Beginining ciab validation prepocessing')
-        self.iterate_through_files(self.val, 'val')
-        print('Beginining ciab test prepocessing')
-        self.iterate_through_files(self.test, 'test')
-        print('Beginining ciab long test prepocessing')
-        self.iterate_through_files(self.long, 'long_test') 
+        #print('Beginining ciab train prepocessing')
+        #self.iterate_through_files(self.train, 'train')
+        #print('Beginining ciab validation prepocessing')
+        #self.iterate_through_files(self.val, 'val')
+        #print('Beginining ciab test prepocessing')
+        #self.iterate_through_files(self.test, 'test')
+        #print('Beginining ciab long test prepocessing')
+        #self.iterate_through_files(self.long, 'long_test') 
         print('Beginining ciab long matched test prepocessing')
-        self.iterate_through_files(self.long_matched, 'long_test') 
-        print('Beginining ciab matched test prepocessing')
-        self.iterate_through_files(self.matched_test, 'matched_test') 
-        print('Beginining ciab matched_train prepocessing')
-        self.iterate_through_files(self.matched_train, 'matched_train')
-        print('Beginining ciab matched_validation prepocessing')
-        self.iterate_through_files(self.matched_validation, 'matched_validation')
-        print('Beginining ciab naive train prepocessing')
-        self.iterate_through_files(self.naive_train, 'naive_train')
-        print('Beginining ciab naive validation prepocessing')
-        self.iterate_through_files(self.naive_validation, 'naive_validation')
-        print('Beginining ciab naive test prepocessing')
-        self.iterate_through_files(self.naive_test, 'naive_test')
-        print('Beginining ciab original train prepocessing')
-        self.iterate_through_files(self.train_original, 'train_original')
-        print('Beginining ciab original test prepocessing')
-        self.iterate_through_files(self.test_original, 'test_original')
-        print('Beginining ciab matched test prepocessing')
-        self.iterate_through_files(self.matched_test_original, 'matched_test_original') 
-        print('Beginining ciab matched_train prepocessing')
-        self.iterate_through_files(self.matched_train_original, 'matched_train_original')
-        print('Beginining ciab matched_validation prepocessing')
-        self.iterate_through_files(self.matched_validation_original, 'matched_validation_original')
-        with open(f'{self.output_base}/audio_16k/errorlist.txt', "w") as output:
-            output.write(str(self.error_list))
-        print('creating json')
+        self.iterate_through_files(self.long_matched, 'long_matched_test') 
+        #print('Beginining ciab matched test prepocessing')
+        #self.iterate_through_files(self.matched_test, 'matched_test') 
+        #print('Beginining ciab matched_train prepocessing')
+        #self.iterate_through_files(self.matched_train, 'matched_train')
+        #print('Beginining ciab matched_validation prepocessing')
+        #self.iterate_through_files(self.matched_validation, 'matched_validation')
+        #print('Beginining ciab naive train prepocessing')
+        #self.iterate_through_files(self.naive_train, 'naive_train')
+        #print('Beginining ciab naive validation prepocessing')
+        #self.iterate_through_files(self.naive_validation, 'naive_validation')
+        #print('Beginining ciab naive test prepocessing')
+        #self.iterate_through_files(self.naive_test, 'naive_test')
+        #print('Beginining ciab original train prepocessing')
+        #self.iterate_through_files(self.train_original, 'train_original')
+        #print('Beginining ciab original test prepocessing')
+        #self.iterate_through_files(self.val_original, 'val_original')
+        #print('Beginining ciab original test prepocessing')
+        #self.iterate_through_files(self.test_original, 'test_original')
+        #print('Beginining ciab matched test prepocessing')
+        #self.iterate_through_files(self.matched_test_original, 'matched_test_original') 
+        #print('Beginining ciab matched_train prepocessing')
+        #self.iterate_through_files(self.matched_train_original, 'matched_train_original')
+        #print('Beginining ciab matched_validation prepocessing')
+        #self.iterate_through_files(self.matched_validation_original, 'matched_validation_original')
+        #with open(f'{self.output_base}/audio_16k/errorlist.txt', "w") as output:
+        #    output.write(str(self.error_list))
+        #print('creating json')
         self.create_json()
 
     def check_modality(self, modality):
@@ -109,27 +111,27 @@ class PrepCIAB():
         '''
         Loads the train and test barcode splits and the corresponding meta_data
         '''
-        self.train = self.meta[self.meta['splits'] == 'train'].audio_sentence.tolist()
-        self.val = self.meta[self.meta['splits'] == 'val'].audio_sentence.tolist()
-        self.test = self.meta[self.meta['splits'] == 'test'].audio_sentence.tolist()
-        self.long = self.meta[self.meta['splits'] == 'long'].audio_sentence.tolist()
-        self.long_matched = self.meta[self.meta['in_matched_rebalanced_test'] == True].audio_sentence.tolist()
+        #self.train = self.meta[self.meta['splits'] == 'train'].audio_sentence.tolist()
+        #self.val = self.meta[self.meta['splits'] == 'val'].audio_sentence.tolist()
+        #self.test = self.meta[self.meta['splits'] == 'test'].audio_sentence.tolist()
+        #self.long = self.meta[self.meta['splits'] == 'long'].audio_sentence.tolist()
+        self.long_matched = self.meta[self.meta['in_matched_rebalanced_long_test'] == True].audio_sentence.tolist()
 
-        self.matched_train = self.meta[self.meta['matched_train_splits'] == 'matched_train'].audio_sentence.tolist()
-        self.matched_validation = self.meta[self.meta['matched_train_splits'] == 'matched_validation'].audio_sentence.tolist()
-        self.matched_test = self.meta[self.meta['in_matched_rebalanced_test'] == True].audio_sentence.tolist()
+        #self.matched_train = self.meta[self.meta['matched_train_splits'] == 'matched_train'].audio_sentence.tolist()
+        #self.matched_validation = self.meta[self.meta['matched_train_splits'] == 'matched_val'].audio_sentence.tolist()
+        #self.matched_test = self.meta[self.meta['in_matched_rebalanced_test'] == True].audio_sentence.tolist()
 
-        self.naive_train = self.meta[self.meta['naive_splits'] == 'train'].audio_sentence.tolist()
-        self.naive_validation = self.meta[self.meta['naive_splits'] == 'validation'].audio_sentence.tolist()
-        self.naive_test = self.meta[self.meta['naive_splits'] == 'test'].audio_sentence.tolist()
+        #self.naive_train = self.meta[self.meta['naive_splits'] == 'train'].audio_sentence.tolist()
+        #self.naive_validation = self.meta[self.meta['naive_splits'] == 'val'].audio_sentence.tolist()
+        #self.naive_test = self.meta[self.meta['naive_splits'] == 'test'].audio_sentence.tolist()
 
-        self.train_original = self.meta[self.meta['original_splits'] == 'train'].audio_sentence.tolist()
-        self.val_original = self.meta[self.meta['original_splits'] == 'val'].audio_sentence.tolist()
-        self.test_original = self.meta[self.meta['original_splits'] == 'test'].audio_sentence.tolist()
+        #self.train_original = self.meta[self.meta['original_splits'] == 'train'].audio_sentence.tolist()
+        #self.val_original = self.meta[self.meta['original_splits'] == 'val'].audio_sentence.tolist()
+        #self.test_original = self.meta[self.meta['original_splits'] == 'test'].audio_sentence.tolist()
 
-        self.matched_train_original = self.meta[self.meta['matched_original_train_splits'] == 'matched_train'].audio_sentence.tolist()
-        self.matched_validation_original = self.meta[self.meta['matched_original_train_splits'] == 'matched_validation'].audio_sentence.tolist()
-        self.matched_test_original = self.meta[self.meta['in_matched_original_test'] == True].audio_sentence.tolist()
+        #self.matched_train_original = self.meta[self.meta['matched_original_train_splits'] == 'matched_train'].audio_sentence.tolist()
+        #self.matched_validation_original = self.meta[self.meta['matched_original_train_splits'] == 'matched_validation'].audio_sentence.tolist()
+        #self.matched_test_original = self.meta[self.meta['in_matched_original_test'] == True].audio_sentence.tolist()
 
     def iterate_through_files(self, dataset, split='train'):
         if not os.path.exists(f'{self.output_base}/audio_16k/{split}'):
@@ -175,6 +177,7 @@ class PrepCIAB():
                 Validation: {len(self.val)} \
                 Test: {len(self.test)}, \
                 Long_test: {len(self.long)} \
+                Long_matched_test: {self.long_matched} \
                 matched_test: {len(self.matched_test)} \
                 matched_train: {len(self.matched_train)} \
                 matched_val: {len(self.matched_validation)} \
@@ -184,59 +187,59 @@ class PrepCIAB():
     
     def create_json(self):
         fold = 1
-        dic_train_list = self.list_to_dict(self.train, 'train')
-        dic_validation_list = self.list_to_dict(self.val, 'validation')
-        dic_test_list = self.list_to_dict(self.test, 'test')
-        dic_matched_test_list = self.list_to_dict(self.matched_test, 'matched_test')
-        dic_matched_train_list = self.list_to_dict(self.matched_train, 'matched_train')
-        dic_matched_validation_list = self.list_to_dict(self.matched_validation, 'matched_validation')
-        dic_long_test_list = self.list_to_dict(self.long, 'long_test')
-        dic_long_matched_test_list = self.list_to_dict(self.long_matched, 'long_matched')
-        dic_naive_train_list = self.list_to_dict(self.naive_train, 'naive_train')
-        dic_naive_validation_list = self.list_to_dict(self.naive_validation, 'naive_validation')
-        dic_naive_test_list = self.list_to_dict(self.naive_test, 'naive_test')
+        #dic_train_list = self.list_to_dict(self.train, 'train')
+        #dic_validation_list = self.list_to_dict(self.val, 'val')
+        #dic_test_list = self.list_to_dict(self.test, 'test')
+        #dic_matched_test_list = self.list_to_dict(self.matched_test, 'matched_test')
+        #dic_matched_train_list = self.list_to_dict(self.matched_train, 'matched_train')
+        #dic_matched_validation_list = self.list_to_dict(self.matched_validation, 'matched_validation')
+        #dic_long_test_list = self.list_to_dict(self.long, 'long_test')
+        dic_long_matched_test_list = self.list_to_dict(self.long_matched, 'long_matched_test')
+        #dic_naive_train_list = self.list_to_dict(self.naive_train, 'naive_train')
+        #dic_naive_validation_list = self.list_to_dict(self.naive_validation, 'naive_validation')
+        #dic_naive_test_list = self.list_to_dict(self.naive_test, 'naive_test')
 
-        dic_train_original_list = self.list_to_dict(self.train_original, 'train_original')
-        dic_validation_original_list = self.list_to_dict(self.val_original, 'train_original')
-        dic_test_original_list = self.list_to_dict(self.test_original, 'test_original')
-        dic_matched_test_original_list = self.list_to_dict(self.matched_test_original, 'matched_test_original')
-        dic_matched_train_original_list = self.list_to_dict(self.matched_train_original, 'matched_train_original')
-        dic_matched_validation_original_list = self.list_to_dict(self.matched_validation_original, 'matched_validation_original')
+        #dic_train_original_list = self.list_to_dict(self.train_original, 'train_original')
+        #dic_validation_original_list = self.list_to_dict(self.val_original, 'val_original')
+        #dic_test_original_list = self.list_to_dict(self.test_original, 'test_original')
+        #dic_matched_test_original_list = self.list_to_dict(self.matched_test_original, 'matched_test_original')
+        #dic_matched_train_original_list = self.list_to_dict(self.matched_train_original, 'matched_train_original')
+        #dic_matched_validation_original_list = self.list_to_dict(self.matched_validation_original, 'matched_validation_original')
 
-        with open(f'./data/datafiles/{self.modality}/ciab_train_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_train_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_validation_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_validation_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_test_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_test_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_long_test_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_long_test_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/ciab_train_data_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_train_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/ciab_validation_data_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_validation_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/ciab_test_data_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_test_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/ciab_long_test_data_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_long_test_list}, f, indent=1)
         with open(f'./data/datafiles/{self.modality}/ciab_long_matched_data_'+ str(fold) +'.json', 'w') as f:
             json.dump({'data': dic_long_matched_test_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_matched_test_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_matched_test_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/dic_matched_validation_list'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_matched_validation_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/dic_matched_train_list'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_matched_train_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/naive_train_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_naive_train_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/naive_validation_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_naive_validation_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/naive_test_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_naive_test_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_train_original_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_train_original_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_validation_original_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_validation_original_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_test_original_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_test_original_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/ciab_matched_test_original_data_'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_matched_test_original_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/dic_matched_validation_original_list'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_matched_validation_original_list}, f, indent=1)
-        with open(f'./data/datafiles/{self.modality}/dic_matched_train_original_list'+ str(fold) +'.json', 'w') as f:
-            json.dump({'data': dic_matched_train_original_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/ciab_matched_test_data_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_matched_test_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/dic_matched_validation_list'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_matched_validation_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/dic_matched_train_list'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_matched_train_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/naive_train_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_naive_train_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/naive_validation_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_naive_validation_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/naive_test_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_naive_test_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/ciab_train_original_data_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_train_original_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/ciab_validation_original_data_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_validation_original_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/ciab_test_original_data_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_test_original_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/ciab_matched_test_original_data_'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_matched_test_original_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/dic_matched_validation_original_list'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_matched_validation_original_list}, f, indent=1)
+        #with open(f'./data/datafiles/{self.modality}/dic_matched_train_original_list'+ str(fold) +'.json', 'w') as f:
+        #    json.dump({'data': dic_matched_train_original_list}, f, indent=1)
     
     
     
@@ -261,13 +264,7 @@ class PrepCIAB():
             ]
         }
         '''
-        #note the additional check for checking if the audio file is faulty. These samples are included in the exp
-        # as participants submitted 4 recordings and we do not disregard them even if one recording is missing.
-        if len(self.error_list) == 0:
-            formatted_list = [{"wav": f'{self.output_base}/audio_16k/{split}/{instance}', "labels": self.meta[self.meta['audio_sentence'] == instance].test_result.iloc[0]} for instance in data]
-            return formatted_list
-        error_list = [self.meta[self.meta[self.modality] == instance].audio_sentence.iloc[0] for instance in self.error_list]
-        formatted_list = [{"wav": f'{self.output_base}/audio_16k/{split}/{instance}', "labels": self.meta[self.meta['audio_sentence'] == instance].test_result.iloc[0]} for instance in data if instance not in error_list]
+        formatted_list = [{"wav": f'{self.output_base}/audio_16k/{split}/{instance}', "labels": self.meta[self.meta['audio_sentence'] == instance].test_result.iloc[0]} for instance in data]
         return formatted_list
 
     def remove_silence(self, signal, filename):
@@ -330,4 +327,4 @@ if __name__ == '__main__':
 
         ciab = PrepCIAB(modality)
         ciab.main()
-        ciab.print_stats()
+        #ciab.print_stats()

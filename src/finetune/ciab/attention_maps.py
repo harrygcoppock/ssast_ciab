@@ -12,13 +12,15 @@ import sys
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.colors import colorConverter
-import cv2
 sys.path.append('../../')
 from models.ast_models import ASTModel
 import dataloader
+np.set_printoptions(threshold=sys.maxsize)
 
-def load_trained_model(model_path, device, pretrain_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/SSAST-Base-Patch-400.pth'
+def load_trained_model(model_path, device, pretrain_path='/workspace/ssast_ciab/src/finetune/ciab/SSAST-Base-Patch-400.pth'
 ):
     args = load_args(model_path)
     args.wandb = False
@@ -45,8 +47,7 @@ def load_args(model_path):
         print(args)
     return args
 
-def get_dataset(args, path_data='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/data/datafiles/audio_sentence_url/ciab_standard_test_data_1.json'):
-    print(os.path.exists(path_data))
+def get_dataset(args, path_data='/workspace/ssast_ciab/src/finetune/ciab/data/datafiles/audio_sentence_url/ciab_test_data_1.json'):
     val_audio_conf = {
             'num_mel_bins': args.num_mel_bins, 
             'target_length': args.target_length, 
@@ -60,7 +61,7 @@ def get_dataset(args, path_data='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssa
             }
     eval_dataset = dataloader.AudioDataset(
         path_data,
-        label_csv='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/data/ciab_class_labels_indices.csv',
+        label_csv='/workspace/ssast_ciab/src/finetune/ciab/data/ciab_class_labels_indices.csv',
         audio_conf=val_audio_conf,
         pca_proj=True)
     eval_loader = torch.utils.data.DataLoader(
@@ -72,7 +73,10 @@ def get_dataset(args, path_data='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssa
     return eval_dataset, eval_loader
 
 def get_attention(audio_model, loader, device, args):
-    fbank, label_indices, index = next(iter(loader))
+    for i, (fbank, label_indices, index) in enumerate(loader):
+        if i == 10:
+            break
+
     print('label', label_indices)
     fbank = fbank.to(device)
     audio_model = audio_model.to(device)
@@ -91,7 +95,6 @@ def format_attention_map(attentions, audio_model, method, args, threshold_att_ma
     '''
     reshape attention so that it is the same size as orignal fbank
     '''
-    print(attentions.shape)
     nh = attentions.shape[1] # number of head
 
     # we keep only the output patch attenion
@@ -100,7 +103,6 @@ def format_attention_map(attentions, audio_model, method, args, threshold_att_ma
     attentions = attentions[batch_num, :, 0, 2:].reshape(nh, -1)
     if method == 'frame':
         attentions = attentions.reshape(nh, audio_model.module.t_dim)
-        print(attentions[0])
         attentions = attentions[0].cpu().numpy()
         #fig = plt.figure()
         #plt.plot(list(range(len(attentions))), attentions)
@@ -118,7 +120,6 @@ def format_attention_map(attentions, audio_model, method, args, threshold_att_ma
                 attentions.unsqueeze(0), 
                 scale_factor=(args.fshape, args.tshape), 
                 mode="nearest")[0].cpu().numpy()
-        print(np.shape(attentions[0]))
         #plt.imsave(fname='first2.png', arr=attentions[0], format='png')
         return attentions, nh
 
@@ -149,11 +150,11 @@ def plot_attentions(attensions, fbank, nh, mean, std, batch_num=0):
     for i in range(nh):
         #plot for each head
         axs[i+1].imshow(attensions[i])
-    plt.savefig('attentions_0_pos.png', bbox_inches='tight')
+    plt.savefig('files/attentions_0_pos.png', bbox_inches='tight')
 
-def plot_attentions_overlay(attensions, fbank, nh, mean, std, batch_num=0):
-    fig, axs = plt.subplots(1,1)
-    axs.imshow(fbank[batch_num])
+def plot_attentions_overlay(attensions, fbank, nh, mean, std, batch_num=0, axs=None):
+    out = []
+    out.append(axs.imshow(fbank[batch_num]))
     color_list = ['cyan', 'magenta', 'darkviolet', 'olive', 'pink', 'blue', 'green', 'lime', 'red', 'orange', 'yellow', 'purple']
     for i in range(nh):
         #plot for each head
@@ -170,60 +171,79 @@ def plot_attentions_overlay(attensions, fbank, nh, mean, std, batch_num=0):
         # here it is progressive, but you can create whathever you want
         alphas = np.linspace(0, 0.8, cmap1.N+3)
         cmap1._lut[:,-1] = alphas
-        axs.imshow(attensions[i], cmap=cmap1)
-    plt.savefig('attentions_overlay_0_covid_pos.png', bbox_inches='tight')
+        out.append(axs.imshow(attensions[i], cmap=cmap1))
+    return out
 
 
-def logits_per_patch(audio_model, device, pca_proj):
+
+def logits_per_patch(audio_model, device, pca_proj, ax, batch_num):
     audio_model = audio_model.to(device)
     audio_model.eval()
     with torch.no_grad():
-        logits = torch.nn.functional.softmax(audio_model.module.mlp_head(pca_proj[0,:,:]))
-        print(logits)
-        #for i in range(pca_proj.size()[1]):
-        #    logits.append(torch.nn.functional.softmax(audio_model.module.mlp_head(pca_proj[-4,i,:])))
-    print(logits)
-    logits = logits[:,1] - logits[:,0]
-    print(logits)
-    #logits = [x[1] - x[0] for x in logits]
-    #logits = [x.cpu().numpy() for x in logits]
-    logits = logits[2:].tolist()
-    plt.figure()
-    plt.plot(range(0, len(logits)), logits)
-    plt.savefig('logits_positive_frame.png')
+        logits = torch.nn.functional.softmax(audio_model.module.mlp_head(pca_proj[batch_num,:,:]))
+    #logits = logits[:,1] - logits[:,0]
+    #logits = logits[2:].tolist()
+    #out = threshold_plot(ax, range(0, len(logits[2:,1].tolist())), logits[2:,1].tolist(), 0.5, 'green', 'red')
+    out = ax.plot(range(0, len(logits[2:,1].tolist())), logits[2:,1].tolist())
+    ax.set_ylim(0,1)
+    ax.fill_between(range(0, len(logits[2:,1].tolist())), 0.5, 1, facecolor='red', alpha=0.4, label='COVID Positive')
+    ax.fill_between(range(0, len(logits[2:,1].tolist())), 0, 0.5, facecolor='green', alpha=0.4, label='COVID Negative')
+  #out.append(ax.plot(range(0, len(logits[2:,1].tolist())), logits[2:,1].tolist(), label='Positive'))
+    #out.append(ax.plot(range(0, len(logits[2:,1].tolist())), logits[2:,0].tolist(), label='Negative'))
+    ax.legend()
+    return out
+
 
 
 def convert_attention_map(attention, spectrum):
     '''
     given the coords of the attention map for the fbank, project onto the spectrum
     '''
-    width, height = spectrum.size()[1]+1, spectrum.size()[0]+1
-    res = cv2.resize(attention, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
-    return res
+    width, height = spectrum.size()[1], spectrum.size()[0]
+    print('width and heigh', width, height)
+    print('attention size', np.shape(attention))
+    new = np.zeros(shape=(width, height))
+    new[:-1:2] = attention
+    new[1::2] = attention
+    return new
 
-def sonfiy_attention(attention, index, eval_dataset):
+def sonfiy_attention(attention, index, eval_dataset, batch_num, args):
     '''
     given the attetion map sonficy the attention portions
     '''
-    datum = eval_dataset.data[index]
+    datum = eval_dataset.data[index[batch_num]]
     filename = datum['wav']
     waveform, sr = torchaudio.load(filename)
-    spectrum, window_shift, window_size = spectrogram_rep(waveform)
+    spectrum, window_shift, window_size = spectrogram_rep(waveform, args)
+    print(np.shape(attention))
+    attention = np.sum(attention, axis=0)
+    print(np.shape(attention))
     attention = convert_attention_map(attention, spectrum)
 
     # now only keep the sections of the spectrogram which the model
     # paid attention to
-
-    spectrum_att = spectrum * attention
+    spectrum_att = select_areas(spectrum, np.transpose(attention))
     t = torchaudio.transforms.InverseSpectrogram(n_fft=512,
                                          win_length=window_size,
                                          hop_length=window_shift)
 
     att_wav = t(spectrum_att.T)
-    torchaudio.save('atten_recon.wav', att_wav.view(1,-1), 16000)
+    torchaudio.save(f'files/{batch_num}waveform.wav', waveform, 16000)
+    torchaudio.save(f'files/{batch_num}atten_recon.wav', att_wav.view(1,-1), 16000)
+    fig, axs = plt.subplots()
+    axs.imshow(spectrum_att.abs().T)
+    plt.savefig(f'files/{batch_num}spectrum_att.png', bbox_inches='tight')
 
+def select_areas(spectrum, attention):
+    attention = torch.tensor(attention)
+    assert spectrum.size() == attention.size()
 
-def spectrogram_rep(waveform):
+    for i in range(spectrum.size()[0]):
+        for j in range(spectrum.size()[1]):
+            spectrum[i,j] = spectrum[i,j] if attention[i,j] >= 1.0 else 0
+    return spectrum
+
+def spectrogram_rep(waveform, args):
     '''
     mimic the spectrogram step in torchaudio fbank
     '''
@@ -254,10 +274,20 @@ def spectrogram_rep(waveform):
 
     # size (m, padded_window_size // 2 + 1)
     spectrum = torch.fft.rfft(strided_input)
-
+    print('spectrum size:   ', spectrum.size())
+    target_length = args.target_length
+    n_frames = spectrum.shape[0]
+    p = target_length - n_frames
+    if p > 0:
+        m = torch.nn.ZeroPad2d((0, 0, 0, p))
+        spectrum = m(spectrum)
+    elif p < 0:
+        spectrum = spectrum[0:target_length, :]
+    print('spectrum size:   ', spectrum.size())
     return spectrum, window_shift, window_size
 
-def main(model_path, method='patch'):
+
+def main(model_path, method='patch', batch_num=85):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     audio_model, args = load_trained_model(model_path, device)
@@ -265,34 +295,33 @@ def main(model_path, method='patch'):
         args.loss_fn = torch.nn.BCEWithLogitsLoss()
     elif args.loss == 'CE':
         args.loss_fn = torch.nn.CrossEntropyLoss()
+    args.batch_size = 50
     eval_dataset, eval_loader = get_dataset(args)   
-
     attention, fbank, pca_proj, index = get_attention(audio_model, eval_loader, device, args)
-    attentions, nh = format_attention_map(attention, audio_model, method, args, threshold_att_maps=False, batch_num=0)
-    fig, axs = plt.subplots(1,1)
-    plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=0, axs)
-    plt.savefig()
+    attentions, nh = format_attention_map(attention, audio_model, method, args, threshold_att_maps=False, batch_num=batch_num)
+    plot_attentions(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num)
     plt.close()
 
     fig, axs = plt.subplots(2,1, sharex=True)
-    attentions, nh = format_attention_map(attention, audio_model, method, args, threshold_att_maps=True, batch_num=0)
-    plot_attentions_overlay(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=0, axs[0])
+    attentions, nh = format_attention_map(attention, audio_model, method, args, threshold_att_maps=True, batch_num=batch_num)
+    plot_attentions_overlay(attentions, fbank, nh, eval_dataset.norm_mean, eval_dataset.norm_std, batch_num=batch_num, axs=axs[0])
 
     #get logits per time step
-    print(pca_proj.size())
-    print(args)
-    audio_model, args = load_trained_model('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train-final/fold1', device, pretrain_path='/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/SSAST-Base-Frame-400.pth'
+    audio_model, args = load_trained_model('/workspace/ssast_ciab/src/finetune/ciab/exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train/fold1', device, pretrain_path='/workspace/ssast_ciab/src/finetune/ciab/SSAST-Base-Frame-400.pth'
 )
     if args.loss == 'BCE':
         args.loss_fn = torch.nn.BCEWithLogitsLoss()
     elif args.loss == 'CE':
         args.loss_fn = torch.nn.CrossEntropyLoss()
-    eval_dataset, eval_loader = get_dataset(args)
-    attention, fbank, pca_proj = get_attention(audio_model, eval_loader, device, args)
-    logits_per_patch(audio_model, device, pca_proj, axs[1])
+    args.batch_size = 50
+    eval_dataset_1, eval_loader_1 = get_dataset(args)
+    attention_1, fbank_1, pca_proj_1, index_1 = get_attention(audio_model, eval_loader_1, device, args)
+    logits_per_patch(audio_model, device, pca_proj_1, axs[1], batch_num=batch_num)
 
+    plt.savefig(f'files/attention_maps_logits_batchnum_{batch_num}.png', bbox_inches='tight')
+    plt.close()
 
-    sonfiy_attention(attention, index, eval_dataset)
+    sonfiy_attention(attentions, index, eval_dataset, batch_num, args)
 
 if __name__ == '__main__':
-    main('/home/ec2-user/SageMaker/jbc-cough-in-a-box/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')
+    main('/workspace/ssast_ciab/src/finetune/ciab/exp/test01-ciab_sentence-f16-16-t16-16-b18-lr1e-4-ft_cls-base-unknown-SSAST-Base-Patch-400-1x-noiseTrue-standard-train-2/fold1')

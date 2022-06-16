@@ -28,9 +28,10 @@ print("I am process %s, running on %s: starting (%s)" % (os.getpid(), os.uname()
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--data-train", type=str, default=None, help="training data json")
 parser.add_argument("--data-val", type=str, default=None, help="validation data json")
-parser.add_argument("--data-standard-test", type=str, default=None, help="test data json")
+parser.add_argument("--data-test", type=str, default=None, help="test data json")
 parser.add_argument("--data-matched-test", type=str, default=None, help="matched test data json")
 parser.add_argument("--data-long-test", type=str, default=None, help="longitudinal data json")
+parser.add_argument("--data-long-matched", type=str, default=None, help="longitudinal matched data json")
 parser.add_argument("--label-csv", type=str, default='', help="csv with class labels")
 parser.add_argument("--n_class", type=int, default=527, help="number of classes")
 
@@ -99,11 +100,6 @@ if args.wandb == 'wandb':
     import wandb
     wandb.init(project='ciab', entity='harrygcoppock')
     wandb.config = args
-# # dataset spectrogram mean and std, used to normalize the input
-# norm_stats = {'librispeech':[-4.2677393, 4.5689974], 'howto100m':[-4.2677393, 4.5689974], 'audioset':[-4.2677393, 4.5689974], 'esc50':[-6.6268077, 5.358466], 'speechcommands':[-6.845978, 5.5654526]}
-# target_length = {'librispeech': 1024, 'howto100m':1024, 'audioset':1024, 'esc50':512, 'speechcommands':128}
-# # if add noise for data augmentation, only use for speech commands
-# noise = {'librispeech': False, 'howto100m': False, 'audioset': False, 'esc50': False, 'speechcommands':True}
 
 audio_conf = {'num_mel_bins': args.num_mel_bins, 'target_length': args.target_length, 'freqm': args.freqm, 'timem': args.timem, 'mixup': args.mixup, 'dataset': args.dataset,
               'mode':'train', 'mean':args.dataset_mean, 'std':args.dataset_std, 'noise':args.noise}
@@ -125,6 +121,7 @@ else:
     train_loader = torch.utils.data.DataLoader(
         dataloader.AudioDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
         batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=False, drop_last=True)
+
 val_dataset = dataloader.AudioDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf)
 val_loader = torch.utils.data.DataLoader(
         val_dataset,
@@ -166,7 +163,7 @@ else:
 
 # if the dataset has a seperate evaluation set (e.g., speechcommands), then select the model using the validation set and eval on the evaluation set.
 # this is only for fine-tuning
-if args.data_standard_test != None:
+if args.data_test != None:
     # saving covid specific results for turing
     metrics = {}
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -190,7 +187,7 @@ if args.data_standard_test != None:
     print("AUC: {:.6f}".format(val_mAUC))
 
     # test the models on the evaluation set
-    eval_dataset = dataloader.AudioDataset(args.data_standard_test, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=True)
+    eval_dataset = dataloader.AudioDataset(args.data_test, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=True)
     eval_loader = torch.utils.data.DataLoader(
         eval_dataset,
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
@@ -201,14 +198,14 @@ if args.data_standard_test != None:
             'eval_set', 
             pca_proj=True, 
             dataset=eval_dataset,
-            test_type='standard_test')
-    metrics['standard_test']= stats[1]
+            test_type='test')
+    metrics['test']= stats[1]
     eval_acc = stats[0]['acc']
     eval_mAUC = np.mean([stat['auc'] for stat in stats])
     print('---------------evaluate on the test set---------------')
     print("Accuracy: {:.6f}".format(eval_acc))
     print("AUC: {:.6f}".format(eval_mAUC))
-    pca_proj.to_csv(args.exp_dir+'/standard_test_pca_projections.csv') 
+    pca_proj.to_csv(args.exp_dir+'/test_pca_projections.csv') 
     np.savetxt(args.exp_dir + '/eval_result.csv', [val_acc, val_mAUC, eval_acc, eval_mAUC])
     if args.data_matched_test != None:
         matched_dataset = dataloader.AudioDataset(args.data_matched_test, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=True)
@@ -250,6 +247,27 @@ if args.data_standard_test != None:
         print("AUC: {:.6f}".format(eval_mAUC))
         np.savetxt(args.exp_dir + '/long_test_result.csv', [val_acc, val_mAUC, eval_acc, eval_mAUC])
         pca_proj.to_csv(args.exp_dir+'/long_test_pca_projections.csv') 
+    
+    if args.data_long_matched != None:
+        long_dataset = dataloader.AudioDataset(args.data_long_matched, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=True)
+        long_test_loader = torch.utils.data.DataLoader(
+                long_dataset,
+                batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+        stats, _, pca_proj = validate(audio_model, 
+                long_test_loader, 
+                args, 
+                'matched_long_set', 
+                pca_proj=True, 
+                dataset=long_dataset,
+                test_type='matched_long_test')
+        metrics['matched_long_test'] = stats[1]
+        eval_acc = stats[0]['acc']
+        eval_mAUC = np.mean([stat['auc'] for stat in stats])
+        print('---------------evaluate on the matched long test set---------------')
+        print("Accuracy: {:.6f}".format(eval_acc))
+        print("AUC: {:.6f}".format(eval_mAUC))
+        np.savetxt(args.exp_dir + '/matched_long_test_result.csv', [val_acc, val_mAUC, eval_acc, eval_mAUC])
+        pca_proj.to_csv(args.exp_dir+'/matched_long_test_pca_projections.csv') 
     # repeat eval for the training set - this is useful so we can train 1NN model and analysis the learnt features
 
     analysis_train_dataset = dataloader.AudioDataset(args.data_train, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=True)
