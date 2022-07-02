@@ -19,7 +19,7 @@ import pickle
 from torch.cuda.amp import autocast,GradScaler
 import wandb # for logging
 
-def train(audio_model, train_loader, test_loader, args):
+def train(audio_model, train_loader, test_loader, args, test_type):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('running on ' + str(device))
     torch.set_grad_enabled(True)
@@ -188,17 +188,17 @@ def train(audio_model, train_loader, test_loader, args):
             global_step += 1
 
         print('start validation')
-        stats, valid_loss = validate(audio_model, test_loader, args, epoch)
+        stats, valid_loss = validate(audio_model, test_loader, args, epoch, test_type=test_type)
 
         # ensemble results
-        cum_stats = validate_ensemble(args, epoch)
+        cum_stats = validate_ensemble(args, epoch, test_type)
         cum_mAP = np.mean([stat['AP'] for stat in cum_stats])
         cum_mAUC = np.mean([stat['auc'] for stat in cum_stats])
         cum_acc = cum_stats[0]['acc']
 
         mAP = np.mean([stat['AP'] for stat in stats])
         mAUC = np.mean([stat['auc'] for stat in stats])
-        acc = stats[0]['acc']
+        acc = stats[1]['acc']
 
         middle_ps = [stat['precisions'][int(len(stat['precisions'])/2)] for stat in stats]
         middle_rs = [stat['recalls'][int(len(stat['recalls'])/2)] for stat in stats]
@@ -376,20 +376,20 @@ def validate(audio_model, val_loader, args, epoch, pca_proj=False, dataset=None,
         return stats, loss, pca_df
     return stats, loss
 
-def validate_ensemble(args, epoch):
+def validate_ensemble(args, epoch, test_type):
     exp_dir = args.exp_dir
-    target = np.loadtxt(exp_dir+'/predictions/target.csv', delimiter=',')
+    target = np.loadtxt(exp_dir+'/predictions'+ test_type + '/target.csv', delimiter=',')
     if epoch == 1:
-        cum_predictions = np.loadtxt(exp_dir + '/predictions/predictions_1.csv', delimiter=',')
+        cum_predictions = np.loadtxt(exp_dir + '/predictions'+ test_type + '/predictions_1.csv', delimiter=',')
     else:
-        cum_predictions = np.loadtxt(exp_dir + '/predictions/cum_predictions.csv', delimiter=',') * (epoch - 1)
-        predictions = np.loadtxt(exp_dir+'/predictions/predictions_' + str(epoch) + '.csv', delimiter=',')
+        cum_predictions = np.loadtxt(exp_dir + '/predictions' + test_type + '/cum_predictions.csv', delimiter=',') * (epoch - 1)
+        predictions = np.loadtxt(exp_dir +'/predictions'+ test_type + '/predictions_' + str(epoch) + '.csv', delimiter=',')
         cum_predictions = cum_predictions + predictions
         # remove the prediction file to save storage space
-        os.remove(exp_dir+'/predictions/predictions_' + str(epoch-1) + '.csv')
+        os.remove(exp_dir+'/predictions' + test_type + '/predictions_' + str(epoch-1) + '.csv')
 
     cum_predictions = cum_predictions / epoch
-    np.savetxt(exp_dir+'/predictions/cum_predictions.csv', cum_predictions, delimiter=',')
+    np.savetxt(exp_dir+'/predictions' + test_type + '/cum_predictions.csv', cum_predictions, delimiter=',')
 
     stats = calculate_stats(cum_predictions, target)
     return stats
