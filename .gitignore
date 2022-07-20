@@ -10,7 +10,6 @@
 *.pkl
 *.png
 *.npy
-src/finetune/ciab/exp/*
 src/finetune/ciab/data/ciab/*
 /src/finetune/ciab/wandb/*
 figure/*
