@@ -373,7 +373,7 @@ def validate(audio_model, val_loader, args, epoch, pca_proj=False, dataset=None,
             np.savetxt(exp_dir+'/predictions' + test_type + '/target.csv', target, delimiter=',')
         np.savetxt(exp_dir+'/predictions' + test_type + '/predictions_' + str(epoch) + '.csv', audio_output, delimiter=',')
     if pca_proj:
-        return stats, loss, pca_df
+        return stats, (loss, pca_df)
     return stats, loss
 
 def validate_ensemble(args, epoch, test_type):

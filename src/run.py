@@ -5,6 +5,8 @@
 # @Email   : yuangong@mit.edu
 # @File    : run.py
 
+
+#TODO: add back in pca proj for evaluation step.
 import argparse
 import os
 import ast
@@ -195,16 +197,17 @@ if args.data_test != None:
             eval_loader, 
             args, 
             'eval_set', 
-            pca_proj=False, 
+            pca_proj=True, 
             dataset=eval_dataset,
             test_type='test')
+    loss, pca_proj = _
     metrics['test']= stats[1]
     eval_acc = stats[1]['acc']
     eval_mAUC = np.mean([stat['auc'] for stat in stats])
     print('---------------evaluate on the test set---------------')
     print("Accuracy: {:.6f}".format(eval_acc))
     print("AUC: {:.6f}".format(eval_mAUC))
-    #pca_proj.to_csv(args.exp_dir+'/test_pca_projections.csv') 
+    pca_proj.to_csv(args.exp_dir+'/test_pca_projections.csv') 
     np.savetxt(args.exp_dir + '/eval_result.csv', [val_acc, val_mAUC, eval_acc, eval_mAUC])
     if args.data_matched_test != None:
         matched_dataset = dataloader.AudioDataset(args.data_matched_test, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=False)
@@ -215,9 +218,10 @@ if args.data_test != None:
                 matched_test_loader, 
                 args, 
                 'matched_set', 
-                pca_proj=False, 
+                pca_proj=True, 
                 dataset=matched_dataset,
                 test_type='matched_test')
+        loss, pca_proj = _
         metrics['matched_test'] = stats[1]
         eval_acc = stats[1]['acc']
         eval_mAUC = np.mean([stat['auc'] for stat in stats])
@@ -225,7 +229,7 @@ if args.data_test != None:
         print("Accuracy: {:.6f}".format(eval_acc))
         print("AUC: {:.6f}".format(eval_mAUC))
         np.savetxt(args.exp_dir + '/matched_test_result.csv', [val_acc, val_mAUC, eval_acc, eval_mAUC])
-        #pca_proj.to_csv(args.exp_dir+'/matched_test_pca_projections.csv') 
+        pca_proj.to_csv(args.exp_dir+'/matched_test_pca_projections.csv') 
     if args.data_long_test != None:
         long_dataset = dataloader.AudioDataset(args.data_long_test, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=False)
         long_test_loader = torch.utils.data.DataLoader(
@@ -235,9 +239,10 @@ if args.data_test != None:
                 long_test_loader, 
                 args, 
                 'long_set', 
-                pca_proj=False, 
+                pca_proj=True, 
                 dataset=long_dataset,
                 test_type='long_test')
+        loss, pca_proj = _
         metrics['long_test'] = stats[1]
         eval_acc = stats[1]['acc']
         eval_mAUC = np.mean([stat['auc'] for stat in stats])
@@ -245,7 +250,7 @@ if args.data_test != None:
         print("Accuracy: {:.6f}".format(eval_acc))
         print("AUC: {:.6f}".format(eval_mAUC))
         np.savetxt(args.exp_dir + '/long_test_result.csv', [val_acc, val_mAUC, eval_acc, eval_mAUC])
-        #pca_proj.to_csv(args.exp_dir+'/long_test_pca_projections.csv') 
+        pca_proj.to_csv(args.exp_dir+'/long_test_pca_projections.csv') 
     
     if args.data_long_matched != None:
         long_dataset = dataloader.AudioDataset(args.data_long_matched, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=False)
@@ -256,9 +261,10 @@ if args.data_test != None:
                 long_test_loader, 
                 args, 
                 'matched_long_set', 
-                pca_proj=False, 
+                pca_proj=True, 
                 dataset=long_dataset,
                 test_type='matched_long_test')
+        loss, pca_proj = _
         metrics['matched_long_test'] = stats[1]
         eval_acc = stats[1]['acc']
         eval_mAUC = np.mean([stat['auc'] for stat in stats])
@@ -266,7 +272,7 @@ if args.data_test != None:
         print("Accuracy: {:.6f}".format(eval_acc))
         print("AUC: {:.6f}".format(eval_mAUC))
         np.savetxt(args.exp_dir + '/matched_long_test_result.csv', [val_acc, val_mAUC, eval_acc, eval_mAUC])
-        #pca_proj.to_csv(args.exp_dir+'/matched_long_test_pca_projections.csv') 
+        pca_proj.to_csv(args.exp_dir+'/matched_long_test_pca_projections.csv') 
     # repeat eval for the training set - this is useful so we can train 1NN model and analysis the learnt features
 
     analysis_train_dataset = dataloader.AudioDataset(args.data_train, label_csv=args.label_csv, audio_conf=val_audio_conf, pca_proj=False)
@@ -277,9 +283,10 @@ if args.data_test != None:
             analysis_train_loader, 
             args, 
             'analysis_train_set', 
-            pca_proj=False, 
+            pca_proj=True, 
             dataset=analysis_train_dataset,
             test_type='analysis_train')
+    loss, pca_proj = _
     metrics['analysis_train_dataset'] = stats[1]
     eval_acc = stats[1]['acc']
     eval_mAUC = np.mean([stat['auc'] for stat in stats])
@@ -287,7 +294,7 @@ if args.data_test != None:
     print("Accuracy: {:.6f}".format(eval_acc))
     print("AUC: {:.6f}".format(eval_mAUC))
     np.savetxt(args.exp_dir + '/analysis_train_result.csv', [val_acc, val_mAUC, eval_acc, eval_mAUC])
-    #pca_proj.to_csv(args.exp_dir+'/analysis_train_pca_projections.csv') 
+    pca_proj.to_csv(args.exp_dir+'/analysis_train_pca_projections.csv') 
     # converting the np arrays to lists
     for key, item in metrics.items():
         item['precisions'] = item['precisions'].tolist()
