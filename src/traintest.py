@@ -7,6 +7,7 @@
 
 import sys
 import os
+import re
 import datetime
 sys.path.append(os.path.dirname(os.path.dirname(sys.path[0])))
 from utilities import *
@@ -371,7 +372,13 @@ def validate(audio_model, val_loader, args, epoch, pca_proj=False, dataset=None,
         if os.path.exists(exp_dir+'/predictions' + test_type) == False:
             os.mkdir(exp_dir+'/predictions' + test_type)
             np.savetxt(exp_dir+'/predictions' + test_type + '/target.csv', target, delimiter=',')
-        np.savetxt(exp_dir+'/predictions' + test_type + '/predictions_' + str(epoch) + '.csv', audio_output, delimiter=',')
+        df = pd.DataFrame(audio_output.numpy(), columns=None)
+
+        #adding identifier to predicts
+        df['barcode'] = torch.cat(A_indexes, dim=0).squeeze().numpy()
+        df['barcode'] = df['barcode'].apply(lambda x:  dataset.data[x]['wav'])
+        df['barcode'] = df['barcode'].apply(lambda x: format_id(x))
+        df.to_csv(exp_dir+'/predictions' + test_type + '/predictions_' + str(epoch) + '.csv')
     if pca_proj:
         return stats, (loss, pca_df)
     return stats, loss
@@ -427,7 +434,7 @@ def tensor_to_csv(pca_proj_values, indexes, dataset):
     the pca projection function expects a csv with a instance names and there
     corresponding learnt vector
     '''
-    pca_proj_values = pca_proj_values.cpu().squeeze().numpy()
+    pca_proj_values = pca_proj_values.cpu().squeeze().view(pca_proj_values.size()[0], -1).numpy()
     pca_df = pd.DataFrame(pca_proj_values, columns=None)
     pca_df['barcode'] = indexes.squeeze().numpy()
     pca_df['barcode'] = pca_df['barcode'].apply(lambda x:  dataset.data[x]['wav'])
