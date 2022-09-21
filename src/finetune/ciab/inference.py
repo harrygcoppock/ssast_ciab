@@ -46,7 +46,7 @@ def load_args(model_path):
         print(args)
     return args
 
-def get_dataset(args, path_data='./data/datafiles/audio_sentence_url/ciab_test_data_1.json'):
+def get_dataset(args, path_data='./data/datafiles/audio_sentence_url/ciab_test_data_1.json', indices=False):
     val_audio_conf = {
             'num_mel_bins': args.num_mel_bins, 
             'target_length': args.target_length, 
@@ -62,7 +62,7 @@ def get_dataset(args, path_data='./data/datafiles/audio_sentence_url/ciab_test_d
         path_data,
         label_csv='./data/ciab_class_labels_indices.csv',
         audio_conf=val_audio_conf,
-        pca_proj=True)
+        indices=indices)
     eval_loader = torch.utils.data.DataLoader(
         eval_dataset,
         batch_size=args.batch_size*2,
@@ -71,7 +71,7 @@ def get_dataset(args, path_data='./data/datafiles/audio_sentence_url/ciab_test_d
         pin_memory=True)
     return eval_dataset, eval_loader
 
-def main(model_path, data_path, test_type, output_dir, method='frame'):
+def main(model_path, data_path, test_type, output_dir, method='frame', pca_proj=False):
     if os.path.exists(output_dir) == False:
         os.makedirs(output_dir)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -83,17 +83,20 @@ def main(model_path, data_path, test_type, output_dir, method='frame'):
     elif args.loss == 'CE':
         args.loss_fn = torch.nn.CrossEntropyLoss()
     args.batch_size = 50
-    eval_dataset, eval_loader = get_dataset(args, data_path)   
+    eval_dataset, eval_loader = get_dataset(args, data_path, indices=True) #to get indexes  
     stats, _ = validate(
             audio_model, 
             eval_loader, 
             args, 
             0,
-            pca_proj=True,
+            pca_proj=pca_proj,
             dataset=eval_dataset,
             test_type=test_type
             )
-    loss, pca_proj = _
+    if pca_proj:
+        loss, pca_proj = _
+    else:
+        loss = _
    # converting the np arrays to lists
     for item in stats:
         
@@ -105,32 +108,57 @@ def main(model_path, data_path, test_type, output_dir, method='frame'):
         json.dump(stats[1], f)
     with open(os.path.join(output_dir, f'metrics_{test_type}_covid_neg.json'), 'w') as f:
         json.dump(stats[0], f)
-    pca_proj.to_csv(os.path.join(output_dir, f'analysis_{test_type}_pca_projections.csv'))
+    if pca_proj:
+        pca_proj.to_csv(os.path.join(output_dir, f'analysis_{test_type}_pca_projections.csv'))
 
 
 
 if __name__ == '__main__':
+    #main(
+    #    './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train/fold1',
+    #    './data/datafiles/audio_sentence_url/ciab_matched_test_data_1.json',
+    #    'train_matched_test',
+    #    './exp/inference/train_matched_test'
+    #    )
     main(
         './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train/fold1',
-        './data/datafiles/audio_sentence_url/ciab_matched_test_data_1.json',
-        'train_matched_test',
-        './exp/inference/train_matched_test'
+        './data/datafiles/audio_sentence_url/ciab_long_test_data_1.json',
+        'train_long_test',
+        './exp/inference/train_long_test'
         )
     main(
         './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train/fold1',
-        './data/datafiles/audio_sentence_url/ciab_long_matched_data_1.json',
-        'train_long_matched_test',
-        './exp/inference/train_long_matched_test'
+        './data/datafiles/audio_sentence_url/ciab_test_data_1.json',
+        'train_test',
+        './exp/inference/train_test'
         )
     main(
-        './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-matched-train/fold1',
-        './data/datafiles/audio_sentence_url/ciab_matched_test_data_1.json',
-        'matched_train_matched_test',
-        './exp/inference/matched_train_matched_test'
+        './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train/fold1',
+        './data/datafiles/audio_sentence_url/ciab_validation_data_1.json',
+        'train_validation',
+        './exp/inference/train_validation'
         )
     main(
-        './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-matched-train/fold1',
-        './data/datafiles/audio_sentence_url/ciab_long_matched_data_1.json',
-        'matched_train_long_matched_test',
-        './exp/inference/matched_train_long_matched_test'
+        './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train/fold1',
+        './data/datafiles/audio_sentence_url/ciab_train_data_1.json',
+        'train_train',
+        './exp/inference/train_train'
         )
+    #main(
+    #    './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-standard-train/fold1',
+    #    './data/datafiles/audio_sentence_url/ciab_long_matched_data_1.json',
+    #    'train_long_matched_test',
+    #    './exp/inference/train_long_matched_test'
+    #    )
+    #main(
+    #    './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-matched-train/fold1',
+    #    './data/datafiles/audio_sentence_url/ciab_matched_test_data_1.json',
+    #    'matched_train_matched_test',
+    #    './exp/inference/matched_train_matched_test'
+    #    )
+    #main(
+    #    './exp/final/ciab_sentence-f128-128-t1-2-b20-lr1e-4-ft_avgtok-base-unknown-SSAST-Base-Frame-400-1x-noiseTrue-matched-train/fold1',
+    #    './data/datafiles/audio_sentence_url/ciab_long_matched_data_1.json',
+    #    'matched_train_long_matched_test',
+    #    './exp/inference/matched_train_long_matched_test'
+    #    )
