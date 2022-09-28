@@ -1,4 +1,5 @@
 import math
+import re
 import pickle
 import numpy as np
 import torch
@@ -297,6 +298,10 @@ def load_progress(prog_pkl, quiet=False):
 
 def count_parameters(model):
     return sum([p.numel() for p in model.parameters() if p.requires_grad])
+
+def format_id(id):
+    id = re.search('[^/]+$', id)
+    return id.group(0)
 
 PrenetConfig = namedtuple(
   'PrenetConfig', ['input_size', 'hidden_size', 'num_layers', 'dropout'])

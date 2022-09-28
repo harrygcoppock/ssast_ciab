@@ -4,9 +4,10 @@
 # @Affiliation  : Massachusetts Institute of Technology
 # @Email   : yuangong@mit.edu
 # @File    : traintest.py
-
+# TODO log indexes even when pca_proj == False so predicts have identifier
 import sys
 import os
+import re
 import datetime
 sys.path.append(os.path.dirname(os.path.dirname(sys.path[0])))
 from utilities import *
@@ -19,7 +20,7 @@ import pickle
 from torch.cuda.amp import autocast,GradScaler
 import wandb # for logging
 
-def train(audio_model, train_loader, test_loader, args, test_type):
+def train(audio_model, train_loader, test_loader, args, test_type, val_dataset=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('running on ' + str(device))
     torch.set_grad_enabled(True)
@@ -188,13 +189,14 @@ def train(audio_model, train_loader, test_loader, args, test_type):
             global_step += 1
 
         print('start validation')
-        stats, valid_loss = validate(audio_model, test_loader, args, epoch, test_type=test_type)
+        stats, valid_loss = validate(audio_model, test_loader, args, epoch, test_type=test_type, dataset=val_dataset)
 
         # ensemble results
         cum_stats = validate_ensemble(args, epoch, test_type)
         cum_mAP = np.mean([stat['AP'] for stat in cum_stats])
         cum_mAUC = np.mean([stat['auc'] for stat in cum_stats])
         cum_acc = cum_stats[0]['acc']
+
 
         mAP = np.mean([stat['AP'] for stat in stats])
         mAUC = np.mean([stat['auc'] for stat in stats])
@@ -313,17 +315,13 @@ def validate(audio_model, val_loader, args, epoch, pca_proj=False, dataset=None,
     A_indexes = []
     with torch.no_grad():
         for i, data in enumerate(val_loader):
-            if pca_proj == True:
-                audio_input, labels, indexes = data
-            else:
-                audio_input, labels = data
+            audio_input, labels, indexes = data
             audio_input = audio_input.to(device)
 
             # compute output
             if pca_proj:
                 audio_output, pca_proj_values = audio_model(audio_input, args.task, pca_proj=pca_proj)
                 A_pca_proj_values.append(pca_proj_values.cpu())
-                A_indexes.append(indexes.cpu())
             else:
                 audio_output = audio_model(audio_input, args.task)
             audio_output_for_loss = audio_output
@@ -333,6 +331,7 @@ def validate(audio_model, val_loader, args, epoch, pca_proj=False, dataset=None,
                 audio_output = torch.sigmoid(audio_output)
             predictions = audio_output.to('cpu').detach()
 
+            A_indexes.append(indexes.cpu())
             A_predictions.append(predictions)
             A_targets.append(labels)
 
@@ -371,19 +370,25 @@ def validate(audio_model, val_loader, args, epoch, pca_proj=False, dataset=None,
         if os.path.exists(exp_dir+'/predictions' + test_type) == False:
             os.mkdir(exp_dir+'/predictions' + test_type)
             np.savetxt(exp_dir+'/predictions' + test_type + '/target.csv', target, delimiter=',')
-        np.savetxt(exp_dir+'/predictions' + test_type + '/predictions_' + str(epoch) + '.csv', audio_output, delimiter=',')
+        df = pd.DataFrame(audio_output.numpy(), columns=None)
+
+        #adding identifier to predicts
+        df['barcode'] = torch.cat(A_indexes, dim=0).squeeze().numpy()
+        df['barcode'] = df['barcode'].apply(lambda x:  dataset.data[x]['wav'])
+        df['barcode'] = df['barcode'].apply(lambda x: format_id(x))
+        df.to_csv(exp_dir+'/predictions' + test_type + '/predictions_' + str(epoch) + '.csv')
     if pca_proj:
-        return stats, loss, pca_df
+        return stats, (loss, pca_df)
     return stats, loss
 
 def validate_ensemble(args, epoch, test_type):
     exp_dir = args.exp_dir
     target = np.loadtxt(exp_dir+'/predictions'+ test_type + '/target.csv', delimiter=',')
     if epoch == 1:
-        cum_predictions = np.loadtxt(exp_dir + '/predictions'+ test_type + '/predictions_1.csv', delimiter=',')
+        cum_predictions = np.genfromtxt(exp_dir + '/predictions'+ test_type + '/predictions_1.csv', delimiter=',', usecols=(0,1,2), skip_header=1)
     else:
         cum_predictions = np.loadtxt(exp_dir + '/predictions' + test_type + '/cum_predictions.csv', delimiter=',') * (epoch - 1)
-        predictions = np.loadtxt(exp_dir +'/predictions'+ test_type + '/predictions_' + str(epoch) + '.csv', delimiter=',')
+        predictions = np.genfromtxt(exp_dir +'/predictions'+ test_type + '/predictions_' + str(epoch) + '.csv', delimiter=',', usecols=(0,1,2), skip_header=1)
         cum_predictions = cum_predictions + predictions
         # remove the prediction file to save storage space
         os.remove(exp_dir+'/predictions' + test_type + '/predictions_' + str(epoch-1) + '.csv')
@@ -427,7 +432,7 @@ def tensor_to_csv(pca_proj_values, indexes, dataset):
     the pca projection function expects a csv with a instance names and there
     corresponding learnt vector
     '''
-    pca_proj_values = pca_proj_values.cpu().squeeze().numpy()
+    pca_proj_values = pca_proj_values.cpu().squeeze().view(pca_proj_values.size()[0], -1).numpy()
     pca_df = pd.DataFrame(pca_proj_values, columns=None)
     pca_df['barcode'] = indexes.squeeze().numpy()
     pca_df['barcode'] = pca_df['barcode'].apply(lambda x:  dataset.data[x]['wav'])

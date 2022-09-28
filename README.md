@@ -10,10 +10,6 @@
  - [Pretrained Models](#Pretrained-Models)
  - [Contact](#Contact)
 
-## News
-Feb 2022: I will present SSAST at [AAAI 2022](https://aaai.org/Conferences/AAAI-22/) at 12:00 PM - 1:45 PM (EST) on February 25th and then 7:45 PM - 9:30 PM (EST) on February 27th. 
-## Harry notes:
-Sndfile fails to important when torchaudio is loaded. To combat this simply update torchaudio.
 ## Introduction  
 
 <p align="center"><img src="https://github.com/YuanGongND/ssast/blob/main/figure/10854_ssast.png?raw=true" alt="Illustration of AST." width="800"/></p>

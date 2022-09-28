@@ -22,7 +22,31 @@ fi
 
 pretrain_exp=unknown
 pretrain_model=SSAST-Base-Frame-400
-for dataset in ciab_sentence ciab_three_cough ciab_cough ciab_ha_sound; do
+for datfor dataset in "ciab_sentence" "ciab_three_cough" "ciab_cough" "ciab_ha_sound"; do
+        echo $dataset
+        if [ "$dataset" = "ciab_three_cough" ]
+        then
+                dataset_mean=-8.2274
+                dataset_std=6.1628
+                dir_name=audio_three_cough_url
+        elif [ "$dataset" = "ciab_sentence" ]
+        then
+                dataset_mean=-7.8505
+                dataset_std=5.4594
+                dir_name=audio_sentence_url
+        elif [ "$dataset" = "ciab_ha_sound" ]
+        then
+                dataset_mean=-8.8451
+                dataset_std=5.9847
+                dir_name=audio_ha_sound_url
+        elif [ "$dataset" = "ciab_cough" ]
+        then
+                dataset_mean=-7.7998
+                dataset_std=6.3570
+                dir_name=audio_cough_url
+        else
+                echo "not working"
+        fiaset in ciab_sentence ciab_three_cough ciab_cough ciab_ha_sound; do
 	echo $dataset
 	if [ "$dataset" == ciab_three_cough ]
 	then
