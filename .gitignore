@@ -10,6 +10,7 @@
 *.pkl
 *.png
 *.npy
+src/finetune/ciab/config.yml
 src/finetune/ciab/exp/public/*
 src/finetune/ciab/data/ciab/*
 /src/finetune/ciab/wandb/*
