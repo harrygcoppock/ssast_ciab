@@ -23,21 +23,25 @@ import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 import soundfile as sf
 
+import yaml
+
 class PrepCIAB():
     POSSIBLE_MODALITIES = ['sentence_url',
                            'exhalation_url',
                            'cough_url',
                            'three_cough_url']
 
-    PATHS = {
-            'meta_bucket': 'ciab-879281191186-prod-s3-pii-ciab-wip',
-            'audio_bucket': 'ciab-879281191186-prod-s3-pii-ciab-approved',
-            }
     RANDOM_SEED = 42
 
     def __init__(self, modality='audio_three_cough_url', symp_clf=False):
         self.modality = self.check_modality(modality)
         self.symp_clf = symp_clf
+        try:
+            with open('config.yml', 'r')as conf:
+                self.PATHS = yaml.safe_load(conf)
+        except FileNotFoundError as err:
+            raise ValueError(f'You need to specify your local paths to the data and meta data: {err}')
+
         self.bucket_meta = self.get_bucket(self.PATHS['meta_bucket'])
         self.bucket_audio = self.get_bucket(self.PATHS['audio_bucket'])
         print('Loading saved metafile')
