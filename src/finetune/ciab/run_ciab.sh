@@ -46,7 +46,6 @@ for datfor dataset in "ciab_sentence" "ciab_three_cough" "ciab_cough" "ciab_ha_s
                 dir_name=audio_cough_url
         else
                 echo "not working"
-        fiaset in ciab_sentence ciab_three_cough ciab_cough ciab_ha_sound; do
 	echo $dataset
 	if [ "$dataset" == ciab_three_cough ]
 	then
