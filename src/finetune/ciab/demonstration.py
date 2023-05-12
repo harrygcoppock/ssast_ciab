@@ -16,11 +16,10 @@ from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.colors import colorConverter
 
-sys.path.append('../../')
 
-from models.ast_models import ASTModel
-import dataloader
-from traintest import validate
+from ssast_ciab.src.models.ast_models import ASTModel
+import ssast_ciab.src.dataloader
+from ssast_ciab.src.traintest import validate
 
 np.set_printoptions(threshold=sys.maxsize)
 
