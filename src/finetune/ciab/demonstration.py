@@ -19,7 +19,7 @@ from matplotlib.colors import colorConverter
 
 from ssast_ciab.src.models.ast_models import ASTModel
 import ssast_ciab.src.dataloader
-from ssast_ciab.src.traintest import validate
+
 
 np.set_printoptions(threshold=sys.maxsize)
 
