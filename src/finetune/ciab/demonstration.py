@@ -23,7 +23,7 @@ import ssast_ciab.src.dataloader
 
 np.set_printoptions(threshold=sys.maxsize)
 
-def load_trained_model(model_path, device
+def load_trained_model(model_path, device, pretrained_path
 ):
     args = load_args(model_path)
     args.wandb = False
@@ -37,7 +37,7 @@ def load_trained_model(model_path, device
             input_tdim=args.target_length,
             model_size=args.model_size,
             pretrain_stage=False,
-            load_pretrained_mdl_path=os.path.join(model_path, 'SSAST-Base-Patch-400.pth'))
+            load_pretrained_mdl_path=os.path.join(model_path, pretrained_path))
     sd = torch.load(os.path.join(model_path, 'best_audio_model.pth'), map_location=device)
     if not isinstance(audio_model, torch.nn.DataParallel):
         audio_model = torch.nn.DataParallel(audio_model)
@@ -258,7 +258,7 @@ def main_demo(model_path, audio_path, method='patch', name='harry'):
     batch_num = 0 # as only one sample in batch
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f'using: {device}')
-    audio_model, args = load_trained_model(os.path.join(model_path, 'patch'), device)
+    audio_model, args = load_trained_model(os.path.join(model_path, 'patch'), device, pretrained_path='SSAST-Base-Patch-400.pth')
     if args.loss == 'BCE':
         args.loss_fn = torch.nn.BCEWithLogitsLoss()
     elif args.loss == 'CE':
@@ -288,7 +288,8 @@ def main_demo(model_path, audio_path, method='patch', name='harry'):
     #get logits per time step
     audio_model, args = load_trained_model(
         os.path.join(model_path, 'frame'),
-        device
+        device,
+        pretrained_path='SSAST-Base-Frame-400.pth'
     )
     if args.loss == 'BCE':
         args.loss_fn = torch.nn.BCEWithLogitsLoss()
