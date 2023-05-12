@@ -37,7 +37,7 @@ def load_trained_model(model_path, device, pretrain_path='/content/drive/MyDrive
             input_tdim=args.target_length,
             model_size=args.model_size,
             pretrain_stage=False,
-            load_pretrained_mdl_path=pretrain_path)
+            load_pretrained_mdl_path=os.path.join(model_path, 'SSAST-Base-Patch-400.pth'))
     sd = torch.load(os.path.join(model_path, 'best_audio_model.pth'), map_location=device)
     if not isinstance(audio_model, torch.nn.DataParallel):
         audio_model = torch.nn.DataParallel(audio_model)
