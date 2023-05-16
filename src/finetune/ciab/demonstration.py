@@ -203,7 +203,7 @@ def sonfiy_attention(attention, waveform, batch_num, args, name):
     torchaudio.save(f'/content/demo/{name}atten_recon.wav', att_wav.view(1,-1), 16000)
     fig, axs = plt.subplots()
     print('Here we can see the parts of the spectrogram which the model classification token in the final layer paid the most attention to')
-    print('You can also have a listen to this part of the signal by downloading the atten_recon.wav file')_
+    print('You can also have a listen to this part of the signal by downloading the atten_recon.wav file')
     axs.set_xlabel('Time (10ms)')
     axs.set_ylabel('Frequency bin')
     axs.imshow(spectrum_att.abs().T)
