@@ -166,6 +166,8 @@ def logits_per_patch(audio_model, device, pca_proj, ax, batch_num):
     ax.set_ylim(0,1)
     ax.fill_between(range(0, len(logits[2:,1].tolist())), 0.5, 1, facecolor='red', alpha=0.4, label='COVID Positive')
     ax.fill_between(range(0, len(logits[2:,1].tolist())), 0, 0.5, facecolor='green', alpha=0.4, label='COVID Negative')
+    ax.set_xlabel('Time (10ms)')
+    ax.set_ylabel('Logit')
     ax.legend()
     return out
 
@@ -200,6 +202,10 @@ def sonfiy_attention(attention, waveform, batch_num, args, name):
     torchaudio.save(f'/content/demo/{name}waveform.wav', waveform, 16000)
     torchaudio.save(f'/content/demo/{name}atten_recon.wav', att_wav.view(1,-1), 16000)
     fig, axs = plt.subplots()
+    print('Here we can see the parts of the spectrogram which the model classification token in the final layer paid the most attention to')
+    print('You can also have a listen to this part of the signal by downloading the atten_recon.wav file')_
+    axs.set_xlabel('Time (10ms)')
+    axs.set_ylabel('Frequency bin')
     axs.imshow(spectrum_att.abs().T)
     plt.savefig(f'/content/demo/{name}spectrum_att.png', bbox_inches='tight')
 
@@ -300,7 +306,8 @@ def main_demo(model_path, audio_path, method='patch', name='harry'):
     logits_per_patch(audio_model, device, pca_proj_1, axs[1], batch_num=batch_num)
 
     plt.savefig(f'/content/demo/attention_maps_logits_batchnum_{name}.png', bbox_inches='tight')
-    print('Here we see a summary of where the 12 attention heads were allocating a lot of weight when creating the CLS (classifcation token')
+    print('Here we see a summary of where the 12 attention heads were allocating a lot of weight when creating the CLS (classifcation token)')
+    print('along with the corresponding COVID-19 prediction/logit per timestep')
     plt.show()
     plt.close()
 
